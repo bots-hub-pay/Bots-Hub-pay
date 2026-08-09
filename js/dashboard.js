@@ -1,4 +1,6 @@
-// Dashboard JavaScript - Bots Hub Pay (FIXED)
+// Dashboard JavaScript - Bots Hub Pay (FULLY UPDATED)
+
+const FULL_DOMAIN = 'https://bots-hub-pay.onrender.com';
 
 document.addEventListener('DOMContentLoaded', function() {
     const isLoggedIn = sessionStorage.getItem('isLoggedIn');
@@ -172,7 +174,6 @@ document.addEventListener('DOMContentLoaded', function() {
     // ===== LOGOUT =====
     document.getElementById('logoutBtn').addEventListener('click', function() {
         if (confirm('Are you sure you want to logout?')) {
-            // ✅ Clear welcome flag on logout
             sessionStorage.removeItem('welcomeShown');
             sessionStorage.clear();
             window.location.href = 'index.html';
@@ -230,7 +231,7 @@ document.addEventListener('DOMContentLoaded', function() {
         navigateTo('dashboard');
     });
 
-    // ✅ FIXED: Welcome message only once per login
+    // ✅ WELCOME MESSAGE - Only Once
     const welcomeShown = sessionStorage.getItem('welcomeShown');
     
     if (!welcomeShown) {
@@ -239,9 +240,72 @@ document.addEventListener('DOMContentLoaded', function() {
             sessionStorage.setItem('welcomeShown', 'true');
         }, 500);
     }
+
+    // ✅ SYNC DATA FROM SERVER (NEW)
+    setTimeout(() => {
+        syncUserData(currentUser);
+    }, 1500);
 });
 
-// ===== HELPER FUNCTIONS =====
+// ============================================
+// ✅ SYNC USER DATA FROM SERVER
+// ============================================
+
+async function syncUserData(user) {
+    console.log('🔄 Syncing data from server...');
+    
+    if (!user || !user.apiKey || !user.apiToken) {
+        console.log('❌ No API credentials found');
+        return;
+    }
+    
+    try {
+        // ✅ Sync balance from server
+        const balanceResponse = await fetch(
+            `${FULL_DOMAIN}/api/balance?apiKey=${user.apiKey}&apiToken=${user.apiToken}`
+        );
+        const balanceData = await balanceResponse.json();
+        
+        if (balanceData.success) {
+            const users = JSON.parse(localStorage.getItem('users') || '[]');
+            const index = users.findIndex(u => u.phone === user.phone);
+            
+            if (index !== -1) {
+                // Update balance
+                users[index].balance = balanceData.data.balance;
+                
+                // ✅ Sync transactions from server
+                const txResponse = await fetch(`${FULL_DOMAIN}/api/transactions/${user.phone}`);
+                const txData = await txResponse.json();
+                
+                if (txData.success && txData.transactions) {
+                    users[index].transactions = txData.transactions;
+                    console.log('✅ Transactions synced:', txData.transactions.length);
+                }
+                
+                localStorage.setItem('users', JSON.stringify(users));
+                
+                // Update UI
+                const updatedUser = users[index];
+                updateBalance(updatedUser);
+                updateStats(updatedUser);
+                renderActivities(updatedUser);
+                
+                console.log('✅ Data synced from server!');
+                console.log('💰 Balance:', balanceData.data.balance);
+                console.log('📝 Transactions:', txData.transactions?.length || 0);
+            }
+        } else {
+            console.log('❌ Balance sync failed:', balanceData.message);
+        }
+    } catch (error) {
+        console.error('Sync error:', error);
+    }
+}
+
+// ============================================
+// HELPER FUNCTIONS
+// ============================================
 
 function updateUserInDatabase(user) {
     const users = JSON.parse(localStorage.getItem('users') || '[]');
@@ -274,7 +338,10 @@ function updateStats(user) {
     if (elements.totalWithdrawn) elements.totalWithdrawn.textContent = '₹' + (user.totalWithdrawn || 0).toFixed(2);
     if (elements.totalSent) elements.totalSent.textContent = '₹' + (user.totalSent || 0).toFixed(2);
     if (elements.totalReceived) elements.totalReceived.textContent = '₹' + (user.totalReceived || 0).toFixed(2);
-    if (elements.totalTransactions) elements.totalTransactions.textContent = (user.transactions || []).length;
+    
+    // ✅ Update transaction count from synced transactions
+    const txCount = (user.transactions || []).length;
+    if (elements.totalTransactions) elements.totalTransactions.textContent = txCount;
 }
 
 function updateBalance(user) {
@@ -282,6 +349,7 @@ function updateBalance(user) {
     if (balanceElement) {
         balanceElement.textContent = '₹' + (user.balance || 0).toFixed(2);
     }
+    // Update all section balances
     const sections = ['addFundBalance', 'withdrawBalance', 'payBalance'];
     sections.forEach(id => {
         const el = document.getElementById(id);
@@ -294,9 +362,12 @@ function renderActivities(user) {
     if (!activityList) return;
 
     let allTransactions = [];
+    
+    // ✅ Get transactions from synced data
     if (user.transactions) {
         allTransactions = allTransactions.concat(user.transactions.map(t => ({ ...t, status: 'approved' })));
     }
+    
     if (user.pendingApprovals) {
         const pendingTxs = user.pendingApprovals
             .filter(a => a.status === 'pending')
@@ -423,6 +494,7 @@ function showToast(message, type) {
     }, 3000);
 }
 
+// Make functions globally available
 window.navigateTo = window.navigateTo || function(page) {
     document.querySelectorAll('.nav-item').forEach(item => {
         item.classList.remove('active');
@@ -432,3 +504,4 @@ window.navigateTo = window.navigateTo || function(page) {
 };
 window.openProfileModal = window.openProfileModal || function() {};
 window.closeProfileModal = window.closeProfileModal || function() {};
+window.syncUserData = syncUserData;
