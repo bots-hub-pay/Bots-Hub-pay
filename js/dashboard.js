@@ -248,14 +248,20 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // ============================================
-// ✅ SYNC USER DATA FROM SERVER
+// ✅ FIXED: SYNC USER DATA FROM SERVER
 // ============================================
 
 async function syncUserData(user) {
     console.log('🔄 Syncing data from server...');
     
-    if (!user || !user.apiKey || !user.apiToken) {
-        console.log('❌ No API credentials found');
+    if (!user) {
+        console.log('❌ No user data');
+        return;
+    }
+    
+    // Check if user has API credentials
+    if (!user.apiKey || !user.apiToken) {
+        console.log('❌ No API credentials found, skipping sync');
         return;
     }
     
@@ -265,6 +271,7 @@ async function syncUserData(user) {
             `${FULL_DOMAIN}/api/balance?apiKey=${user.apiKey}&apiToken=${user.apiToken}`
         );
         const balanceData = await balanceResponse.json();
+        console.log('📊 Balance Response:', balanceData);
         
         if (balanceData.success) {
             const users = JSON.parse(localStorage.getItem('users') || '[]');
@@ -273,14 +280,20 @@ async function syncUserData(user) {
             if (index !== -1) {
                 // Update balance
                 users[index].balance = balanceData.data.balance;
+                console.log('💰 Balance updated:', balanceData.data.balance);
                 
                 // ✅ Sync transactions from server
-                const txResponse = await fetch(`${FULL_DOMAIN}/api/transactions/${user.phone}`);
-                const txData = await txResponse.json();
-                
-                if (txData.success && txData.transactions) {
-                    users[index].transactions = txData.transactions;
-                    console.log('✅ Transactions synced:', txData.transactions.length);
+                try {
+                    const txResponse = await fetch(`${FULL_DOMAIN}/api/transactions/${user.phone}`);
+                    const txData = await txResponse.json();
+                    console.log('📝 Transactions Response:', txData);
+                    
+                    if (txData.success && txData.transactions) {
+                        users[index].transactions = txData.transactions;
+                        console.log('✅ Transactions synced:', txData.transactions.length);
+                    }
+                } catch (txError) {
+                    console.log('⚠️ Transactions sync failed:', txError.message);
                 }
                 
                 localStorage.setItem('users', JSON.stringify(users));
@@ -291,15 +304,17 @@ async function syncUserData(user) {
                 updateStats(updatedUser);
                 renderActivities(updatedUser);
                 
-                console.log('✅ Data synced from server!');
+                console.log('✅ Data synced from server successfully!');
                 console.log('💰 Balance:', balanceData.data.balance);
-                console.log('📝 Transactions:', txData.transactions?.length || 0);
+                console.log('📝 Total Transactions:', users[index].transactions?.length || 0);
+            } else {
+                console.log('❌ User not found in localStorage');
             }
         } else {
             console.log('❌ Balance sync failed:', balanceData.message);
         }
     } catch (error) {
-        console.error('Sync error:', error);
+        console.error('❌ Sync error:', error.message);
     }
 }
 
