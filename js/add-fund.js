@@ -1,4 +1,6 @@
-// Add Fund JavaScript - Bots Hub Pay
+// Add Fund JavaScript - Bots Hub Pay (FIXED)
+
+const FULL_DOMAIN = 'https://bots-hub-pay.onrender.com';
 
 document.addEventListener('DOMContentLoaded', function() {
     const isLoggedIn = sessionStorage.getItem('isLoggedIn');
@@ -178,7 +180,8 @@ function generateQRCode() {
     };
 }
 
-function submitFundRequest(user) {
+// ✅ FIXED: Submit Fund Request with Server Sync
+async function submitFundRequest(user) {
     const utrId = document.getElementById('utrId').value.trim();
     const pin = document.getElementById('fundPin').value;
     
@@ -204,6 +207,36 @@ function submitFundRequest(user) {
         updateUserInDatabase(user);
     }
 
+    // ✅ Sync user with server before submitting
+    try {
+        showToast('⏳ Syncing with server...', 'info');
+        
+        const syncResponse = await fetch(`${FULL_DOMAIN}/api/generate-key`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                phone: user.phone,
+                fullName: user.fullName || 'User',
+                email: user.email || '',
+                balance: user.balance || 0
+            })
+        });
+        
+        const syncData = await syncResponse.json();
+        console.log('Sync Response:', syncData);
+        
+        if (syncData.success) {
+            user.apiKey = syncData.data.apiKey;
+            user.apiToken = syncData.data.apiToken;
+            user.balance = syncData.data.balance;
+            updateUserInDatabase(user);
+            console.log('✅ User synced with server');
+        }
+    } catch (error) {
+        console.error('Sync Error:', error);
+    }
+
+    // ✅ Create pending approval request
     const request = {
         id: Date.now().toString(),
         type: 'add_fund',
@@ -230,7 +263,10 @@ function submitFundRequest(user) {
     setTimeout(() => { window.location.href = 'dashboard.html'; }, 1500);
 }
 
-// Owner Controls Functions
+// ============================================
+// OWNER CONTROLS FUNCTIONS
+// ============================================
+
 function checkOwnerStatus(user) {
     const ownerPhone = '8824146248';
     if (user && user.phone === ownerPhone) {
@@ -344,7 +380,10 @@ function downloadQR() {
     showToast('✅ QR Code downloaded!', 'success');
 }
 
-// Helper Functions
+// ============================================
+// HELPER FUNCTIONS
+// ============================================
+
 function updateUserInDatabase(user) {
     const users = JSON.parse(localStorage.getItem('users') || '[]');
     const index = users.findIndex(u => u.phone === user.phone);
