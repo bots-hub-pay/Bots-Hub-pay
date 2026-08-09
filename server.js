@@ -8,7 +8,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // ============================================
-// ✅ COMPLETE CORS FIX - Server Connection Error
+// ✅ COMPLETE CORS FIX
 // ============================================
 app.use(cors({
     origin: '*',
@@ -26,7 +26,7 @@ app.use(bodyParser.json({ limit: '10mb' }));
 app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
 app.use(express.static(__dirname));
 
-// ✅ Log all requests for debugging
+// ✅ Log all requests
 app.use((req, res, next) => {
     console.log(`📝 ${req.method} ${req.url}`);
     if (req.body && Object.keys(req.body).length > 0) {
