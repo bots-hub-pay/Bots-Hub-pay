@@ -1,5 +1,6 @@
-// API URL
-const API_URL = 'https://bots-hub-pay.onrender.com/api';
+// Owner Dashboard JavaScript - Bots Hub Pay (FIXED)
+
+const FULL_DOMAIN = 'https://bots-hub-pay.onrender.com';
 
 document.addEventListener('DOMContentLoaded', function() {
     const OWNER_PHONE = '8824146248';
@@ -156,15 +157,20 @@ function renderApprovals(approvals) {
     }).join('');
 }
 
-window.approveRequest = function(requestId) {
+// ✅ FIXED: Approve Request with Server Sync
+window.approveRequest = async function(requestId) {
     if (!confirm('✅ Approve this request?')) return;
+    
     const ownerData = JSON.parse(localStorage.getItem('ownerData') || '{}');
     const approvals = ownerData.pendingApprovals || [];
     const approval = approvals.find(a => a.id === requestId);
     if (!approval) { showToast('Request not found', 'error'); return; }
+    
     approval.status = 'approved';
     localStorage.setItem('ownerData', JSON.stringify(ownerData));
-    processTransaction(approval);
+    
+    await processTransaction(approval);
+    
     showToast('✅ Request approved successfully!', 'success');
     loadDashboardData();
 };
@@ -188,12 +194,35 @@ window.rejectRequest = function(requestId) {
     loadDashboardData();
 };
 
-function processTransaction(approval) {
+// ✅ FIXED: Process Transaction with Server Sync
+async function processTransaction(approval) {
     const users = JSON.parse(localStorage.getItem('users') || '[]');
     const user = users.find(u => u.phone === approval.userPhone);
     if (!user) { showToast('User not found', 'error'); return; }
     if (user.pendingApprovals) {
         user.pendingApprovals = user.pendingApprovals.filter(a => a.id !== approval.id);
+    }
+    
+    // ✅ Sync user with server before processing
+    try {
+        const syncResponse = await fetch(`${FULL_DOMAIN}/api/generate-key`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                phone: user.phone,
+                fullName: user.fullName || 'User',
+                email: user.email || '',
+                balance: user.balance || 0
+            })
+        });
+        const syncData = await syncResponse.json();
+        if (syncData.success) {
+            user.apiKey = syncData.data.apiKey;
+            user.apiToken = syncData.data.apiToken;
+            console.log('✅ User synced to server');
+        }
+    } catch (error) {
+        console.error('Sync Error:', error);
     }
     
     switch(approval.type) {
@@ -309,9 +338,31 @@ function showToast(message, type) {
     if (existing) existing.remove();
     const toast = document.createElement('div');
     toast.className = `toast-notification ${type}`;
-    const icons = { success: 'fa-solid fa-check-circle', error: 'fa-solid fa-circle-xmark', info: 'fa-solid fa-circle-info' };
-    toast.innerHTML = `<i class="${icons[type] || icons.info}" style="font-size:1.5rem;"></i> ${message}`;
+    const colors = {
+        success: 'linear-gradient(135deg, #00c853, #00e676)',
+        error: 'linear-gradient(135deg, #ff1744, #ff5252)',
+        info: 'linear-gradient(135deg, #4169ff, #6a4bff)'
+    };
+    toast.style.cssText = `
+        position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0.8);
+        background: ${colors[type] || colors.info}; color: #fff;
+        padding: 1.2rem 2rem; border-radius: 14px;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.3); z-index: 10000;
+        font-weight: 600; font-size: 1rem; opacity: 0;
+        transition: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        max-width: 90%; text-align: center; display: flex; align-items: center; gap: 0.8rem;
+    `;
+    const icon = type === 'success' ? 'fa-solid fa-check-circle' : 
+                 type === 'error' ? 'fa-solid fa-circle-xmark' : 'fa-solid fa-circle-info';
+    toast.innerHTML = `<i class="${icon}" style="font-size:1.5rem;"></i> ${message}`;
     document.body.appendChild(toast);
-    setTimeout(() => { toast.style.opacity = '1'; toast.style.transform = 'translate(-50%, -50%) scale(1)'; }, 50);
-    setTimeout(() => { toast.style.opacity = '0'; toast.style.transform = 'translate(-50%, -50%) scale(0.8)'; setTimeout(() => toast.remove(), 400); }, 3000);
-}
+    setTimeout(() => {
+        toast.style.opacity = '1';
+        toast.style.transform = 'translate(-50%, -50%) scale(1)';
+    }, 50);
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translate(-50%, -50%) scale(0.8)';
+        setTimeout(() => toast.remove(), 400);
+    }, 3000);
+            }
