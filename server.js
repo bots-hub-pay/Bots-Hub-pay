@@ -1,21 +1,30 @@
 const express = require('express');
 const cors = require('cors');
-const bodyParser = require('body-parser');
-const fs = require('fs');
 const path = require('path');
+const fs = require('fs');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Middleware
 app.use(cors({
     origin: '*',
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// ✅ Serve static files
 app.use(express.static(__dirname));
 
+// ✅ Log all requests for debugging
+app.use((req, res, next) => {
+    console.log(`📝 ${req.method} ${req.url}`);
+    next();
+});
+
+// API Routes
 const DB_PATH = path.join(__dirname, 'database.json');
 
 function getDB() {
@@ -23,7 +32,9 @@ function getDB() {
         if (fs.existsSync(DB_PATH)) {
             return JSON.parse(fs.readFileSync(DB_PATH, 'utf8'));
         }
-    } catch (e) {}
+    } catch (e) {
+        console.error('DB Error:', e);
+    }
     return { users: [], ownerData: {} };
 }
 
@@ -71,6 +82,7 @@ function generateApiToken() {
     return token;
 }
 
+// API Endpoints
 app.post('/api/generate-key', (req, res) => {
     const { phone } = req.body;
     if (!phone) {
@@ -88,7 +100,7 @@ app.post('/api/generate-key', (req, res) => {
     return res.json({
         success: true,
         message: 'API key generated successfully',
-        data: { apiKey: apiKey, apiToken: apiToken, phone: user.phone, name: user.fullName }
+        data: { apiKey, apiToken, phone: user.phone, name: user.fullName }
     });
 });
 
@@ -109,14 +121,6 @@ app.get('/api/balance', (req, res) => {
 
 app.get('/APIs/api', async (req, res) => {
     const { token, key, paytoNumber, amount, comment } = req.query;
-
-    console.log('========================================');
-    console.log('📱 API Payment Request:');
-    console.log('Token:', token);
-    console.log('Key:', key);
-    console.log('PaytoNumber:', paytoNumber);
-    console.log('Amount:', amount);
-    console.log('========================================');
 
     if (!token || !key) {
         return res.status(400).json({ success: false, message: 'Missing API credentials' });
@@ -216,7 +220,7 @@ app.get('/APIs/api', async (req, res) => {
 app.post('/APIs/api', async (req, res) => {
     const { token, key, paytoNumber, amount, comment } = req.body;
     req.query = { token, key, paytoNumber, amount, comment };
-    app.handle(req, res);
+    app._router.handle(req, res);
 });
 
 app.get('/api/users', (req, res) => {
@@ -251,15 +255,65 @@ app.get('/api/status', (req, res) => {
     });
 });
 
+// ✅ Serve HTML files for all routes
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
+app.get('/dashboard', (req, res) => {
+    res.sendFile(path.join(__dirname, 'dashboard.html'));
+});
+
+app.get('/add-fund', (req, res) => {
+    res.sendFile(path.join(__dirname, 'add-fund.html'));
+});
+
+app.get('/api-keys', (req, res) => {
+    res.sendFile(path.join(__dirname, 'api-keys.html'));
+});
+
+app.get('/forgot-password', (req, res) => {
+    res.sendFile(path.join(__dirname, 'forgot-password.html'));
+});
+
+app.get('/owner-dashboard', (req, res) => {
+    res.sendFile(path.join(__dirname, 'owner-dashboard.html'));
+});
+
+app.get('/pay-user', (req, res) => {
+    res.sendFile(path.join(__dirname, 'pay-user.html'));
+});
+
+app.get('/profile', (req, res) => {
+    res.sendFile(path.join(__dirname, 'profile.html'));
+});
+
+app.get('/register', (req, res) => {
+    res.sendFile(path.join(__dirname, 'register.html'));
+});
+
+app.get('/settings', (req, res) => {
+    res.sendFile(path.join(__dirname, 'settings.html'));
+});
+
+app.get('/transaction-history', (req, res) => {
+    res.sendFile(path.join(__dirname, 'transaction-history.html'));
+});
+
+app.get('/withdraw', (req, res) => {
+    res.sendFile(path.join(__dirname, 'withdraw.html'));
+});
+
+// ✅ Catch-all for any other routes
+app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
+});
+
+// Start server
 app.listen(PORT, '0.0.0.0', () => {
     console.log('========================================');
     console.log('🚀 Bots Hub API Server Running');
     console.log(`📡 Port: ${PORT}`);
-    console.log(`🌐 Domain: https://bots-hub.free.je`);
-    console.log(`🔗 API Endpoint: https://bots-hub.free.je/APIs/api`);
+    console.log(`🌐 URL: https://bots-hub-pay.onrender.com`);
     console.log('========================================');
 });
