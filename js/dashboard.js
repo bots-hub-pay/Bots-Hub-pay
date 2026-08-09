@@ -1,4 +1,4 @@
-// Dashboard JavaScript - Bots Hub Pay
+// Dashboard JavaScript - Bots Hub Pay (FIXED)
 
 document.addEventListener('DOMContentLoaded', function() {
     const isLoggedIn = sessionStorage.getItem('isLoggedIn');
@@ -57,12 +57,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // ===== SINGLE NAVIGATION FUNCTION =====
     window.navigateTo = function(page) {
-        // Close sidebar on mobile
         if (window.innerWidth <= 768) {
             closeSidebarFunc();
         }
         
-        // Update active state
         document.querySelectorAll('.nav-item').forEach(item => {
             item.classList.remove('active');
         });
@@ -72,7 +70,6 @@ document.addEventListener('DOMContentLoaded', function() {
             activeItem.classList.add('active');
         }
         
-        // Hide all sections
         const sections = [
             'dashboardContent', 'profileSection', 'addFundSection', 
             'withdrawSection', 'payUserSection', 'apiKeysSection', 
@@ -84,7 +81,6 @@ document.addEventListener('DOMContentLoaded', function() {
             if (el) el.style.display = 'none';
         });
         
-        // Show selected section
         const sectionMap = {
             'dashboard': 'dashboardContent',
             'profile': 'profileSection',
@@ -105,7 +101,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
         
-        // Update page title
         const titleMap = {
             'dashboard': 'Dashboard',
             'profile': 'Profile',
@@ -123,7 +118,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     };
 
-    // Load section specific data
     function loadSectionData(page, user) {
         switch(page) {
             case 'dashboard':
@@ -178,6 +172,8 @@ document.addEventListener('DOMContentLoaded', function() {
     // ===== LOGOUT =====
     document.getElementById('logoutBtn').addEventListener('click', function() {
         if (confirm('Are you sure you want to logout?')) {
+            // ✅ Clear welcome flag on logout
+            sessionStorage.removeItem('welcomeShown');
             sessionStorage.clear();
             window.location.href = 'index.html';
         }
@@ -234,10 +230,15 @@ document.addEventListener('DOMContentLoaded', function() {
         navigateTo('dashboard');
     });
 
-    // Show welcome message only once
-    setTimeout(function() {
-        showToast('👋 Welcome back, ' + (currentUser.fullName || 'User') + '!', 'success');
-    }, 500);
+    // ✅ FIXED: Welcome message only once per login
+    const welcomeShown = sessionStorage.getItem('welcomeShown');
+    
+    if (!welcomeShown) {
+        setTimeout(function() {
+            showToast('👋 Welcome back, ' + (currentUser.fullName || 'User') + '!', 'success');
+            sessionStorage.setItem('welcomeShown', 'true');
+        }, 500);
+    }
 });
 
 // ===== HELPER FUNCTIONS =====
@@ -281,7 +282,6 @@ function updateBalance(user) {
     if (balanceElement) {
         balanceElement.textContent = '₹' + (user.balance || 0).toFixed(2);
     }
-    // Update all section balances
     const sections = ['addFundBalance', 'withdrawBalance', 'payBalance'];
     sections.forEach(id => {
         const el = document.getElementById(id);
@@ -423,9 +423,7 @@ function showToast(message, type) {
     }, 3000);
 }
 
-// Make functions globally available
 window.navigateTo = window.navigateTo || function(page) {
-    // This will be overridden by the main function
     document.querySelectorAll('.nav-item').forEach(item => {
         item.classList.remove('active');
     });
