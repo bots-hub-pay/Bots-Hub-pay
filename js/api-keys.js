@@ -1,4 +1,4 @@
-// API Keys JavaScript - Bots Hub Pay
+// API Keys JavaScript - Bots Hub Pay (FIXED)
 
 document.addEventListener('DOMContentLoaded', function() {
     const isLoggedIn = sessionStorage.getItem('isLoggedIn');
@@ -43,6 +43,7 @@ document.addEventListener('DOMContentLoaded', function() {
             apiKeyValue.textContent = currentUser.apiKey;
             apiTokenValue.textContent = currentUser.apiToken;
 
+            // ✅ CORRECT API URL FORMAT
             const fullUrl = `${FULL_DOMAIN}/APIs/api?token=${currentUser.apiToken}&key=${currentUser.apiKey}&paytoNumber={number}&amount={amount}&comment={comment}`;
             apiUrlDisplay.textContent = fullUrl;
             
@@ -70,50 +71,49 @@ document.addEventListener('DOMContentLoaded', function() {
 
     loadApiKeys();
 
-    // Generate New API Key
-    document.getElementById('generateKeyBtn').addEventListener('click', function() {
+    // ✅ FIXED: Generate New API Key with Server Sync
+    document.getElementById('generateKeyBtn').addEventListener('click', async function() {
         if (currentUser.apiKey) {
             if (!confirm('⚠️ You already have an API key. Generating a new one will revoke the old key.\n\nContinue?')) {
                 return;
             }
         }
 
-        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-        let key = '', token = '';
-        for (let i = 0; i < 20; i++) key += chars.charAt(Math.floor(Math.random() * chars.length));
-        for (let i = 0; i < 40; i++) token += chars.charAt(Math.floor(Math.random() * chars.length));
-
-        currentUser.apiKey = key;
-        currentUser.apiToken = token;
-        updateUserInDatabase(currentUser);
-
-        loadApiKeys();
-        showToast('✅ New API key generated successfully!', 'success');
-    });
-
-    // Copy API URL
-    document.getElementById('copyApiBtn').addEventListener('click', function() {
-        if (!currentUser.apiKey) {
-            showToast('Please generate an API key first', 'error');
-            return;
+        // ✅ Generate through server API
+        try {
+            const response = await fetch(`${FULL_DOMAIN}/api/generate-key`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ phone: currentUser.phone })
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                // Update local user data
+                const users = JSON.parse(localStorage.getItem('users') || '[]');
+                const index = users.findIndex(u => u.phone === currentUser.phone);
+                if (index !== -1) {
+                    users[index].apiKey = data.data.apiKey;
+                    users[index].apiToken = data.data.apiToken;
+                    localStorage.setItem('users', JSON.stringify(users));
+                    currentUser = users[index];
+                }
+                
+                loadApiKeys();
+                showToast('✅ New API key generated successfully!', 'success');
+            } else {
+                showToast('❌ ' + data.message, 'error');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            showToast('❌ Failed to generate API key. Please try again.', 'error');
         }
-        const url = `${FULL_DOMAIN}/APIs/api?token=${currentUser.apiToken}&key=${currentUser.apiKey}&paytoNumber={number}&amount={amount}&comment={comment}`;
-        navigator.clipboard.writeText(url).then(() => {
-            showToast('✅ API URL copied!', 'success');
-        }).catch(() => {
-            const ta = document.createElement('textarea');
-            ta.value = url;
-            document.body.appendChild(ta);
-            ta.select();
-            document.execCommand('copy');
-            ta.remove();
-            showToast('✅ API URL copied!', 'success');
-        });
     });
 
-    // Test API
-    document.getElementById('testApiBtn').addEventListener('click', function() {
-        if (!currentUser.apiKey) {
+    // ✅ FIXED: Test API with proper credentials
+    document.getElementById('testApiBtn').addEventListener('click', async function() {
+        if (!currentUser.apiKey || !currentUser.apiToken) {
             showToast('Please generate an API key first', 'error');
             return;
         }
@@ -133,26 +133,46 @@ document.addEventListener('DOMContentLoaded', function() {
         const testComment = prompt('Enter comment (optional):', 'API Test Payment');
         showToast('🔍 Processing test payment...', 'info');
 
+        // ✅ Correct API URL with credentials
         const apiUrl = `${FULL_DOMAIN}/APIs/api?token=${currentUser.apiToken}&key=${currentUser.apiKey}&paytoNumber=${testPhone}&amount=${testAmount}&comment=${encodeURIComponent(testComment || 'Test')}`;
 
-        fetch(apiUrl)
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    currentUser = updateUserInDatabase(currentUser);
-                    showToast(`✅ ₹${testAmount} sent to ${data.data.recipient_name || testPhone} successfully!`, 'success');
-                } else {
-                    showToast('❌ ' + data.message, 'error');
-                }
-            })
-            .catch(error => {
-                console.error('API Error:', error);
-                showToast('❌ API call failed. Please check server connection.', 'error');
-            });
+        try {
+            const response = await fetch(apiUrl);
+            const data = await response.json();
+            
+            if (data.success) {
+                showToast(`✅ ₹${testAmount} sent to ${data.data.recipient_name || testPhone} successfully!`, 'success');
+            } else {
+                showToast('❌ ' + data.message, 'error');
+            }
+        } catch (error) {
+            console.error('API Error:', error);
+            showToast('❌ API call failed. Please check server connection.', 'error');
+        }
     });
 
-    // Revoke API Key
-    document.getElementById('revokeKeyBtn').addEventListener('click', function() {
+    // ✅ Copy API URL
+    document.getElementById('copyApiBtn').addEventListener('click', function() {
+        if (!currentUser.apiKey || !currentUser.apiToken) {
+            showToast('Please generate an API key first', 'error');
+            return;
+        }
+        const url = `${FULL_DOMAIN}/APIs/api?token=${currentUser.apiToken}&key=${currentUser.apiKey}&paytoNumber={number}&amount={amount}&comment={comment}`;
+        navigator.clipboard.writeText(url).then(() => {
+            showToast('✅ API URL copied!', 'success');
+        }).catch(() => {
+            const ta = document.createElement('textarea');
+            ta.value = url;
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            ta.remove();
+            showToast('✅ API URL copied!', 'success');
+        });
+    });
+
+    // ✅ Revoke API Key
+    document.getElementById('revokeKeyBtn').addEventListener('click', async function() {
         if (!currentUser.apiKey) {
             showToast('No API key to revoke', 'error');
             return;
