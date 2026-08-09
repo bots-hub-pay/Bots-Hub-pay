@@ -27,20 +27,21 @@ app.use(express.static(__dirname));
 const DB_PATH = path.join(__dirname, 'database.json');
 
 // ============================================
-// DATABASE FUNCTIONS
+// ✅ SIMPLIFIED DATABASE FUNCTIONS
 // ============================================
 
 function initDB() {
     if (!fs.existsSync(DB_PATH)) {
-        saveDB({ users: [], ownerData: {} });
+        fs.writeFileSync(DB_PATH, JSON.stringify({ users: [], ownerData: {} }, null, 2));
         console.log('✅ Database created');
     }
 }
 
-function getDB() {
+function readDB() {
     try {
         if (fs.existsSync(DB_PATH)) {
-            return JSON.parse(fs.readFileSync(DB_PATH, 'utf8'));
+            const data = fs.readFileSync(DB_PATH, 'utf8');
+            return JSON.parse(data);
         }
     } catch (e) {
         console.error('DB Read Error:', e);
@@ -48,25 +49,26 @@ function getDB() {
     return { users: [], ownerData: {} };
 }
 
-function saveDB(data) {
+function writeDB(data) {
     try {
         fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2));
-        console.log('✅ Database saved');
+        console.log('✅ Database saved successfully');
+        return true;
     } catch (e) {
         console.error('DB Write Error:', e);
+        return false;
     }
 }
 
 function getUsers() {
-    const db = getDB();
+    const db = readDB();
     return db.users || [];
 }
 
 function saveUsers(users) {
-    const db = getDB();
+    const db = readDB();
     db.users = users;
-    saveDB(db);
-    console.log('✅ Users saved to database');
+    return writeDB(db);
 }
 
 function getUserByPhone(phone) {
@@ -75,14 +77,15 @@ function getUserByPhone(phone) {
 }
 
 // ============================================
-// CREATE OR UPDATE USER
+// ✅ CREATE OR UPDATE USER
 // ============================================
 
 function createOrUpdateUser(userData) {
-    const users = getUsers();
+    let users = getUsers();
     const index = users.findIndex(u => u.phone === userData.phone);
     
     if (index !== -1) {
+        // Update existing user
         users[index] = {
             ...users[index],
             fullName: userData.fullName || users[index].fullName,
@@ -100,6 +103,7 @@ function createOrUpdateUser(userData) {
         };
         console.log(`✅ User ${userData.phone} updated`);
     } else {
+        // Create new user
         users.push({
             phone: userData.phone,
             fullName: userData.fullName || 'User',
@@ -126,12 +130,11 @@ function createOrUpdateUser(userData) {
 }
 
 function updateUser(user) {
-    const users = getUsers();
+    let users = getUsers();
     const index = users.findIndex(u => u.phone === user.phone);
     if (index !== -1) {
         users[index] = user;
-        saveUsers(users);
-        return true;
+        return saveUsers(users);
     }
     return false;
 }
@@ -167,14 +170,11 @@ app.post('/api/generate-key', (req, res) => {
     const { phone, fullName, email, balance } = req.body;
     
     console.log('========================================');
-    console.log('📝 Generate Key Request:', phone);
+    console.log('📝 Generate Key:', phone);
     console.log('========================================');
     
     if (!phone) {
-        return res.status(400).json({ 
-            success: false, 
-            message: 'Phone number is required' 
-        });
+        return res.status(400).json({ success: false, message: 'Phone number is required' });
     }
     
     let user = getUserByPhone(phone);
@@ -232,19 +232,13 @@ app.get('/api/balance', (req, res) => {
     const { apiKey, apiToken } = req.query;
     
     if (!apiKey || !apiToken) {
-        return res.status(400).json({ 
-            success: false, 
-            message: 'API key and token are required' 
-        });
+        return res.status(400).json({ success: false, message: 'API key and token are required' });
     }
     
     const user = getUsers().find(u => u.apiKey === apiKey && u.apiToken === apiToken);
     
     if (!user) {
-        return res.status(401).json({ 
-            success: false, 
-            message: 'Invalid API credentials'
-        });
+        return res.status(401).json({ success: false, message: 'Invalid API credentials' });
     }
     
     return res.json({
@@ -271,7 +265,6 @@ app.get('/APIs/api', async (req, res) => {
     console.log('Key:', key);
     console.log('PaytoNumber:', paytoNumber);
     console.log('Amount:', amount);
-    console.log('Comment:', comment);
     console.log('========================================');
 
     // ✅ Validate
@@ -301,7 +294,7 @@ app.get('/APIs/api', async (req, res) => {
         return res.status(400).json({ success: false, message: 'Invalid amount' });
     }
 
-    // ✅ Get users from database
+    // ✅ Get users
     let users = getUsers();
     console.log('👥 Total users in DB:', users.length);
     
@@ -311,7 +304,7 @@ app.get('/APIs/api', async (req, res) => {
         return res.status(401).json({ success: false, message: 'Invalid API credentials' });
     }
 
-    console.log('✅ Sender:', sender.phone, sender.fullName);
+    console.log('✅ Sender found:', sender.phone, sender.fullName);
     console.log('💰 Sender Balance Before:', sender.balance);
 
     // ✅ Check sender balance
@@ -323,7 +316,7 @@ app.get('/APIs/api', async (req, res) => {
         });
     }
 
-    // ✅ Find OR create recipient
+    // ✅ Find or create recipient
     let recipient = users.find(u => u.phone === cleanPhone);
     
     if (!recipient) {
@@ -351,19 +344,20 @@ app.get('/APIs/api', async (req, res) => {
         console.log('✅ New recipient created:', cleanPhone);
     }
 
-    // ✅ Refresh users after potential creation
+    // ✅ Refresh users from database
     users = getUsers();
     sender = users.find(u => u.apiKey === key && u.apiToken === token);
     recipient = users.find(u => u.phone === cleanPhone);
 
-    console.log('✅ Recipient:', recipient.phone, recipient.fullName);
+    console.log('✅ Recipient found:', recipient.phone, recipient.fullName);
     console.log('💰 Recipient Balance Before:', recipient.balance);
 
-    // ✅ PROCESS PAYMENT - DEDUCT FROM SENDER
+    // ✅ PROCESS PAYMENT
+    // 1. Deduct from sender
     sender.balance = (sender.balance || 0) - amountNum;
     sender.totalSent = (sender.totalSent || 0) + amountNum;
 
-    // ✅ PROCESS PAYMENT - ADD TO RECIPIENT
+    // 2. Add to recipient
     recipient.balance = (recipient.balance || 0) + amountNum;
     recipient.totalReceived = (recipient.totalReceived || 0) + amountNum;
 
@@ -375,7 +369,8 @@ app.get('/APIs/api', async (req, res) => {
         type: 'sent',
         amount: amountNum,
         description: `💰 Sent to ${recipient.fullName || cleanPhone}${comment ? ' - ' + comment : ''}`,
-        time: new Date().toISOString()
+        time: new Date().toISOString(),
+        status: 'completed'
     };
     if (!sender.transactions) sender.transactions = [];
     sender.transactions.unshift(senderTx);
@@ -386,36 +381,45 @@ app.get('/APIs/api', async (req, res) => {
         type: 'received',
         amount: amountNum,
         description: `💰 Received from ${sender.fullName || sender.phone}${comment ? ' - ' + comment : ''}`,
-        time: new Date().toISOString()
+        time: new Date().toISOString(),
+        status: 'completed'
     };
     if (!recipient.transactions) recipient.transactions = [];
     recipient.transactions.unshift(recipientTx);
     console.log('✅ Recipient transaction added');
 
-    // ✅ UPDATE USERS IN DATABASE
+    // ✅ UPDATE USERS IN ARRAY
     const senderIndex = users.findIndex(u => u.phone === sender.phone);
     const recipientIndex = users.findIndex(u => u.phone === recipient.phone);
 
     if (senderIndex !== -1) users[senderIndex] = sender;
     if (recipientIndex !== -1) users[recipientIndex] = recipient;
 
-    // ✅ SAVE TO DATABASE
-    saveUsers(users);
-    console.log('✅ Database saved');
+    // ✅ SAVE TO DATABASE - CRITICAL STEP
+    const saved = saveUsers(users);
+    
+    if (!saved) {
+        console.log('❌ Failed to save to database!');
+        return res.status(500).json({ 
+            success: false, 
+            message: 'Failed to save transaction' 
+        });
+    }
 
     // ✅ VERIFY SAVE
     const verifyUsers = getUsers();
     const verifySender = verifyUsers.find(u => u.phone === sender.phone);
     const verifyRecipient = verifyUsers.find(u => u.phone === recipient.phone);
     
-    console.log('✅ Verification:');
+    console.log('========================================');
+    console.log('✅ VERIFICATION:');
     console.log('   Sender Balance:', verifySender?.balance);
     console.log('   Recipient Balance:', verifyRecipient?.balance);
-    console.log('   Sender Transactions:', verifySender?.transactions?.length || 0);
-    console.log('   Recipient Transactions:', verifyRecipient?.transactions?.length || 0);
+    console.log('   Sender TX Count:', verifySender?.transactions?.length || 0);
+    console.log('   Recipient TX Count:', verifyRecipient?.transactions?.length || 0);
     console.log('========================================');
 
-    // ✅ SUCCESS RESPONSE
+    // ✅ SUCCESS
     return res.json({
         success: true,
         message: '✅ Payment Successful!'
@@ -429,7 +433,7 @@ app.post('/APIs/api', async (req, res) => {
     app._router.handle(req, res);
 });
 
-// Get all users
+// Get all users with transactions
 app.get('/api/users', (req, res) => {
     const users = getUsers();
     const safeUsers = users.map(u => ({
@@ -439,7 +443,7 @@ app.get('/api/users', (req, res) => {
         balance: u.balance || 0,
         totalSent: u.totalSent || 0,
         totalReceived: u.totalReceived || 0,
-        transactions: (u.transactions || []).length,
+        transactions: u.transactions || [],
         hasApiKey: !!(u.apiKey && u.apiToken),
         createdAt: u.createdAt
     }));
@@ -469,14 +473,6 @@ app.get('/api/status', (req, res) => {
         status: 'active',
         version: '1.0.0',
         timestamp: new Date().toISOString(),
-        endpoints: {
-            payment: '/APIs/api',
-            balance: '/api/balance',
-            generate_key: '/api/generate-key',
-            users: '/api/users',
-            transactions: '/api/transactions/:phone',
-            status: '/api/status'
-        },
         stats: { 
             total_users: users.length,
             users_with_api: users.filter(u => u.apiKey).length,
@@ -486,7 +482,7 @@ app.get('/api/status', (req, res) => {
 });
 
 // ============================================
-// SERVE HTML FILES
+// SERVE HTML
 // ============================================
 
 app.get('/', (req, res) => {
@@ -537,7 +533,6 @@ app.get('/withdraw', (req, res) => {
     res.sendFile(path.join(__dirname, 'withdraw.html'));
 });
 
-// Catch all
 app.get('*', (req, res) => {
     if (req.path.includes('.')) {
         return res.status(404).send('File not found');
