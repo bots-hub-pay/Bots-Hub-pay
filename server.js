@@ -27,7 +27,7 @@ app.use(express.static(__dirname));
 const DB_PATH = path.join(__dirname, 'database.json');
 
 // ============================================
-// ✅ SIMPLIFIED DATABASE FUNCTIONS
+// DATABASE FUNCTIONS
 // ============================================
 
 function initDB() {
@@ -77,7 +77,7 @@ function getUserByPhone(phone) {
 }
 
 // ============================================
-// ✅ CREATE OR UPDATE USER
+// CREATE OR UPDATE USER
 // ============================================
 
 function createOrUpdateUser(userData) {
@@ -85,7 +85,7 @@ function createOrUpdateUser(userData) {
     const index = users.findIndex(u => u.phone === userData.phone);
     
     if (index !== -1) {
-        // Update existing user
+        // Update existing user - KEEP BALANCE
         users[index] = {
             ...users[index],
             fullName: userData.fullName || users[index].fullName,
@@ -101,7 +101,7 @@ function createOrUpdateUser(userData) {
             activities: userData.activities || users[index].activities || [],
             pendingApprovals: userData.pendingApprovals || users[index].pendingApprovals || []
         };
-        console.log(`✅ User ${userData.phone} updated`);
+        console.log(`✅ User ${userData.phone} updated. Balance: ${users[index].balance}`);
     } else {
         // Create new user
         users.push({
@@ -122,7 +122,7 @@ function createOrUpdateUser(userData) {
             activities: [],
             pendingApprovals: []
         });
-        console.log(`✅ New user ${userData.phone} created`);
+        console.log(`✅ New user ${userData.phone} created. Balance: ${userData.balance || 0}`);
     }
     
     saveUsers(users);
@@ -294,7 +294,7 @@ app.get('/APIs/api', async (req, res) => {
         return res.status(400).json({ success: false, message: 'Invalid amount' });
     }
 
-    // ✅ Get users
+    // ✅ Get users from database
     let users = getUsers();
     console.log('👥 Total users in DB:', users.length);
     
@@ -316,17 +316,18 @@ app.get('/APIs/api', async (req, res) => {
         });
     }
 
-    // ✅ Find or create recipient
+    // ✅ CRITICAL: Find OR Create recipient with proper balance
     let recipient = users.find(u => u.phone === cleanPhone);
     
     if (!recipient) {
         console.log('⚠️ Recipient not found. Creating new user...');
+        // ✅ Create recipient with 0 balance initially
         recipient = {
             phone: cleanPhone,
             fullName: 'Test User',
             email: 'test@example.com',
             password: 'default123',
-            balance: 0,
+            balance: 0,  // ✅ Start with 0
             totalFundAdded: 0,
             totalWithdrawn: 0,
             totalSent: 0,
@@ -341,28 +342,36 @@ app.get('/APIs/api', async (req, res) => {
         };
         users.push(recipient);
         saveUsers(users);
-        console.log('✅ New recipient created:', cleanPhone);
+        console.log('✅ New recipient created with balance: 0');
     }
 
-    // ✅ Refresh users from database
+    // ✅ CRITICAL: Refresh users from database AFTER potential creation
     users = getUsers();
     sender = users.find(u => u.apiKey === key && u.apiToken === token);
     recipient = users.find(u => u.phone === cleanPhone);
+
+    if (!recipient) {
+        console.log('❌ CRITICAL: Recipient not found after refresh!');
+        return res.status(500).json({ success: false, message: 'Recipient creation failed' });
+    }
 
     console.log('✅ Recipient found:', recipient.phone, recipient.fullName);
     console.log('💰 Recipient Balance Before:', recipient.balance);
 
     // ✅ PROCESS PAYMENT
     // 1. Deduct from sender
-    sender.balance = (sender.balance || 0) - amountNum;
+    const senderOldBalance = sender.balance || 0;
+    sender.balance = senderOldBalance - amountNum;
     sender.totalSent = (sender.totalSent || 0) + amountNum;
 
     // 2. Add to recipient
-    recipient.balance = (recipient.balance || 0) + amountNum;
+    const recipientOldBalance = recipient.balance || 0;
+    recipient.balance = recipientOldBalance + amountNum;
     recipient.totalReceived = (recipient.totalReceived || 0) + amountNum;
 
     console.log('💰 Sender Balance After:', sender.balance);
     console.log('💰 Recipient Balance After:', recipient.balance);
+    console.log('✅ Amount added to recipient:', amountNum);
 
     // ✅ CREATE TRANSACTION FOR SENDER
     const senderTx = {
@@ -395,7 +404,7 @@ app.get('/APIs/api', async (req, res) => {
     if (senderIndex !== -1) users[senderIndex] = sender;
     if (recipientIndex !== -1) users[recipientIndex] = recipient;
 
-    // ✅ SAVE TO DATABASE - CRITICAL STEP
+    // ✅ SAVE TO DATABASE
     const saved = saveUsers(users);
     
     if (!saved) {
@@ -406,7 +415,7 @@ app.get('/APIs/api', async (req, res) => {
         });
     }
 
-    // ✅ VERIFY SAVE
+    // ✅ VERIFY SAVE - CRITICAL CHECK
     const verifyUsers = getUsers();
     const verifySender = verifyUsers.find(u => u.phone === sender.phone);
     const verifyRecipient = verifyUsers.find(u => u.phone === recipient.phone);
@@ -418,6 +427,13 @@ app.get('/APIs/api', async (req, res) => {
     console.log('   Sender TX Count:', verifySender?.transactions?.length || 0);
     console.log('   Recipient TX Count:', verifyRecipient?.transactions?.length || 0);
     console.log('========================================');
+
+    // ✅ Check if recipient balance was actually updated
+    if (verifyRecipient && verifyRecipient.balance !== recipient.balance) {
+        console.log('❌ WARNING: Recipient balance mismatch!');
+        console.log('   Expected:', recipient.balance);
+        console.log('   Actual:', verifyRecipient.balance);
+    }
 
     // ✅ SUCCESS
     return res.json({
