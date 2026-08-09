@@ -8,7 +8,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // ============================================
-// ✅ COMPLETE CORS FIX
+// ✅ COMPLETE CORS FIX - Server Connection Error
 // ============================================
 app.use(cors({
     origin: '*',
@@ -26,7 +26,7 @@ app.use(bodyParser.json({ limit: '10mb' }));
 app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
 app.use(express.static(__dirname));
 
-// ✅ Log all requests
+// ✅ Log all requests for debugging
 app.use((req, res, next) => {
     console.log(`📝 ${req.method} ${req.url}`);
     if (req.body && Object.keys(req.body).length > 0) {
@@ -293,7 +293,7 @@ app.get('/api/balance', (req, res) => {
 });
 
 // ============================================
-// ✅ COMPLETE FIXED: PAYMENT API
+// ✅ FIXED: PAYMENT API
 // ============================================
 
 app.get('/APIs/api', async (req, res) => {
@@ -308,7 +308,6 @@ app.get('/APIs/api', async (req, res) => {
     console.log('Comment:', comment);
     console.log('========================================');
 
-    // ✅ Validate credentials
     if (!token || !key) {
         return res.status(400).json({ 
             success: false, 
@@ -343,7 +342,6 @@ app.get('/APIs/api', async (req, res) => {
     console.log('📱 Original:', paytoNumber);
     console.log('📱 Cleaned:', cleanPhone);
     
-    // ✅ Auto-fix phone number for testing
     if (!cleanPhone || cleanPhone.length === 0) {
         cleanPhone = '9876543210';
         console.log('📱 Using default test number:', cleanPhone);
@@ -417,7 +415,7 @@ app.get('/APIs/api', async (req, res) => {
     console.log('✅ Recipient found:', recipient.phone, recipient.fullName);
     console.log('💰 Recipient Balance Before:', recipient.balance);
 
-    // ✅ PROCESS PAYMENT - DEDUCT BALANCE
+    // ✅ PROCESS PAYMENT
     sender.balance = (sender.balance || 0) - amountNum;
     sender.totalSent = (sender.totalSent || 0) + amountNum;
 
@@ -427,7 +425,7 @@ app.get('/APIs/api', async (req, res) => {
     console.log('💰 Sender Balance After:', sender.balance);
     console.log('💰 Recipient Balance After:', recipient.balance);
 
-    // ✅ Create transaction records for sender
+    // ✅ Create transaction records
     const senderTx = {
         type: 'sent',
         amount: amountNum,
@@ -438,7 +436,6 @@ app.get('/APIs/api', async (req, res) => {
     if (!sender.transactions) sender.transactions = [];
     sender.transactions.unshift(senderTx);
 
-    // ✅ Create transaction records for recipient
     const recipientTx = {
         type: 'received',
         amount: amountNum,
@@ -461,7 +458,6 @@ app.get('/APIs/api', async (req, res) => {
     console.log('✅ Payment processed successfully!');
     console.log('========================================');
 
-    // ✅ SIMPLE SUCCESS MESSAGE - No user details
     return res.json({
         success: true,
         message: '✅ Payment Successful!'
