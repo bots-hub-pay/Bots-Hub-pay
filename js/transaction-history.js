@@ -1,5 +1,5 @@
-// Top of file mein yeh line add karein
-const API_URL = 'https://bots-hub-pay.onrender.com/api';
+// Transaction History JavaScript - Bots Hub Pay
+
 document.addEventListener('DOMContentLoaded', function() {
     const isLoggedIn = sessionStorage.getItem('isLoggedIn');
     if (!isLoggedIn) {
@@ -21,7 +21,7 @@ document.addEventListener('DOMContentLoaded', function() {
     let allTransactions = [];
 
     if (currentUser.transactions) {
-        allTransactions = allTransactions.concat(currentUser.transactions.map(t => ({ ...t, status: 'approved' })));
+        allTransactions = allTransactions.concat(currentUser.transactions);
     }
     if (currentUser.pendingApprovals) {
         const pendingTxs = currentUser.pendingApprovals
@@ -33,9 +33,7 @@ document.addEventListener('DOMContentLoaded', function() {
                              a.type === 'withdraw' ? 'Withdraw (Pending)' :
                              'Pay to User (Pending)',
                 time: a.timestamp,
-                status: 'pending',
-                isPending: true,
-                approvalId: a.id
+                status: 'pending'
             }));
         allTransactions = allTransactions.concat(pendingTxs);
     }
@@ -43,47 +41,15 @@ document.addEventListener('DOMContentLoaded', function() {
     allTransactions.sort((a, b) => new Date(b.time) - new Date(a.time));
     document.getElementById('transactionCount').textContent = allTransactions.length + ' transactions';
 
-    function getIconClass(type) {
-        const icons = { 'add': 'add', 'withdraw': 'withdraw', 'sent': 'sent', 'received': 'received', 'pending': 'pending' };
-        return icons[type] || 'add';
-    }
-
-    function getAmountClass(type, status) {
-        if (status === 'pending') return 'pending';
-        const classes = { 'add': 'add', 'withdraw': 'withdraw', 'sent': 'sent', 'received': 'received' };
-        return classes[type] || 'add';
-    }
-
-    function getIcon(type) {
-        const icons = {
-            'add': 'fa-solid fa-circle-plus',
-            'withdraw': 'fa-solid fa-arrow-right',
-            'sent': 'fa-solid fa-paper-plane',
-            'received': 'fa-solid fa-arrow-down',
-            'pending': 'fa-regular fa-clock'
-        };
-        return icons[type] || 'fa-solid fa-circle';
-    }
-
-    function getStatusBadge(status) {
-        if (status === 'pending') {
-            return '<span class="status-badge pending">⏳ Pending</span>';
-        } else if (status === 'approved') {
-            return '<span class="status-badge approved">✅ Approved</span>';
-        } else if (status === 'rejected') {
-            return '<span class="status-badge rejected">❌ Rejected</span>';
-        }
-        return '';
-    }
-
     function renderTransactions(filter) {
         const container = document.getElementById('transactionList');
         let filtered = allTransactions;
+        
         if (filter !== 'all') {
             if (filter === 'pending') {
                 filtered = allTransactions.filter(t => t.status === 'pending');
             } else {
-                filtered = allTransactions.filter(t => t.type === filter && t.status === 'approved');
+                filtered = allTransactions.filter(t => t.type === filter && t.status !== 'pending');
             }
         }
 
@@ -94,17 +60,44 @@ document.addEventListener('DOMContentLoaded', function() {
 
         container.innerHTML = filtered.map(t => {
             const time = new Date(t.time);
-            const timeStr = time.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-            const iconClass = getIconClass(t.type);
-            const amountClass = getAmountClass(t.type, t.status);
-            const sign = t.type === 'add' || t.type === 'received' ? '+' : '-';
-            const statusBadge = getStatusBadge(t.status);
-            let displayDesc = t.description || t.type.charAt(0).toUpperCase() + t.type.slice(1);
-            if (t.status === 'pending') { displayDesc = displayDesc + ' ⏳'; }
+            const timeStr = time.toLocaleString('en-US', { 
+                month: 'short', 
+                day: 'numeric', 
+                year: 'numeric', 
+                hour: '2-digit', 
+                minute: '2-digit' 
+            });
+            
+            let iconClass = 'add';
+            let icon = 'fa-solid fa-circle-plus';
+            let amountClass = 'add';
+            let sign = '+';
+            let displayDesc = t.description || t.type;
+
+            if (t.status === 'pending') {
+                iconClass = 'pending';
+                icon = 'fa-regular fa-clock';
+                amountClass = 'pending';
+                sign = '⏳';
+            } else if (t.type === 'sent' || t.type === 'withdraw') {
+                iconClass = 'sent';
+                icon = 'fa-solid fa-paper-plane';
+                amountClass = 'sent';
+                sign = '-';
+            } else if (t.type === 'received' || t.type === 'add') {
+                iconClass = 'received';
+                icon = 'fa-solid fa-arrow-down';
+                amountClass = 'received';
+                sign = '+';
+            }
+
+            const statusBadge = t.status === 'pending' ? 
+                '<span class="status-badge pending">⏳ Pending</span>' : 
+                '<span class="status-badge approved">✅ Completed</span>';
 
             return `<div class="transaction-item">
                 <div class="transaction-left">
-                    <div class="transaction-icon ${iconClass}"><i class="${getIcon(t.type)}"></i></div>
+                    <div class="transaction-icon ${iconClass}"><i class="${icon}"></i></div>
                     <div class="transaction-details">
                         <div class="desc">${displayDesc}</div>
                         <div class="time">${timeStr}</div>
