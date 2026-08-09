@@ -1,4 +1,4 @@
-// API Keys JavaScript - Bots Hub Pay (FIXED)
+// API Keys JavaScript - Bots Hub Pay (COMPLETE FIXED)
 
 const FULL_DOMAIN = 'https://bots-hub-pay.onrender.com';
 
@@ -98,7 +98,7 @@ function setupEventListeners(currentUser) {
                     phone: currentUser.phone,
                     fullName: currentUser.fullName || 'User',
                     email: currentUser.email || '',
-                    balance: currentUser.balance || 0  // ✅ Send balance to server
+                    balance: currentUser.balance || 0
                 })
             });
             
@@ -106,19 +106,18 @@ function setupEventListeners(currentUser) {
             console.log('Server Response:', data);
             
             if (data.success) {
-                // ✅ Update local user data
                 const users = JSON.parse(localStorage.getItem('users') || '[]');
                 const index = users.findIndex(u => u.phone === currentUser.phone);
                 if (index !== -1) {
                     users[index].apiKey = data.data.apiKey;
                     users[index].apiToken = data.data.apiToken;
-                    users[index].balance = data.data.balance;  // ✅ Update balance from server
+                    users[index].balance = data.data.balance;
                     localStorage.setItem('users', JSON.stringify(users));
                     currentUser = users[index];
                 }
                 
                 loadApiKeys();
-                showToast(`✅ API key generated! Balance: ₹${data.data.balance}`, 'success');
+                showToast(`✅ API key generated!`, 'success');
             } else {
                 showToast('❌ ' + data.message, 'error');
             }
@@ -184,14 +183,21 @@ function setupEventListeners(currentUser) {
             const data = await response.json();
             
             if (data.success) {
-                showToast(`✅ ₹${testAmount} sent to ${data.data.recipient_name || testPhone} successfully!`, 'success');
+                showToast(`✅ Payment Successful!`, 'success');
                 // ✅ Update local balance
                 const users = JSON.parse(localStorage.getItem('users') || '[]');
                 const index = users.findIndex(u => u.phone === currentUser.phone);
                 if (index !== -1) {
-                    users[index].balance = data.data.sender_balance_after;
-                    localStorage.setItem('users', JSON.stringify(users));
-                    currentUser = users[index];
+                    // Get updated balance from server
+                    const newBalance = await fetch(
+                        `${FULL_DOMAIN}/api/balance?apiKey=${currentUser.apiKey}&apiToken=${currentUser.apiToken}`
+                    );
+                    const newBalanceData = await newBalance.json();
+                    if (newBalanceData.success) {
+                        users[index].balance = newBalanceData.data.balance;
+                        localStorage.setItem('users', JSON.stringify(users));
+                        currentUser = users[index];
+                    }
                 }
             } else {
                 showToast('❌ ' + data.message, 'error');
