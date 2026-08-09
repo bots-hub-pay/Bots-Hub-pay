@@ -1,31 +1,29 @@
 const express = require('express');
 const cors = require('cors');
-const path = require('path');
+const bodyParser = require('body-parser');
 const fs = require('fs');
+const path = require('path');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middleware
 app.use(cors({
     origin: '*',
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
-// ✅ Serve static files
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static(__dirname));
 
-// ✅ Log all requests for debugging
-app.use((req, res, next) => {
-    console.log(`📝 ${req.method} ${req.url}`);
-    next();
-});
-
-// API Routes
 const DB_PATH = path.join(__dirname, 'database.json');
+
+// ✅ Initialize database if not exists
+function initDB() {
+    if (!fs.existsSync(DB_PATH)) {
+        saveDB({ users: [], ownerData: {} });
+    }
+}
 
 function getDB() {
     try {
@@ -33,13 +31,18 @@ function getDB() {
             return JSON.parse(fs.readFileSync(DB_PATH, 'utf8'));
         }
     } catch (e) {
-        console.error('DB Error:', e);
+        console.error('DB Read Error:', e);
     }
     return { users: [], ownerData: {} };
 }
 
 function saveDB(data) {
-    fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2));
+    try {
+        fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2));
+        console.log('✅ Database saved successfully');
+    } catch (e) {
+        console.error('DB Write Error:', e);
+    }
 }
 
 function getUsers() {
@@ -54,7 +57,42 @@ function saveUsers(users) {
 }
 
 function getUserByPhone(phone) {
-    return getUsers().find(u => u.phone === phone);
+    const users = getUsers();
+    return users.find(u => u.phone === phone);
+}
+
+// ✅ NEW: Create or update user in database
+function createOrUpdateUser(userData) {
+    const users = getUsers();
+    const index = users.findIndex(u => u.phone === userData.phone);
+    
+    if (index !== -1) {
+        // Update existing user
+        users[index] = { ...users[index], ...userData };
+    } else {
+        // Create new user
+        users.push({
+            phone: userData.phone,
+            fullName: userData.fullName || 'User',
+            email: userData.email || '',
+            password: userData.password || '',
+            balance: userData.balance || 0,
+            totalFundAdded: userData.totalFundAdded || 0,
+            totalWithdrawn: userData.totalWithdrawn || 0,
+            totalSent: userData.totalSent || 0,
+            totalReceived: userData.totalReceived || 0,
+            apiKey: userData.apiKey || null,
+            apiToken: userData.apiToken || null,
+            isActive: true,
+            createdAt: userData.createdAt || new Date().toISOString(),
+            transactions: userData.transactions || [],
+            activities: userData.activities || [],
+            pendingApprovals: userData.pendingApprovals || []
+        });
+    }
+    
+    saveUsers(users);
+    return getUserByPhone(userData.phone);
 }
 
 function updateUser(user) {
@@ -70,57 +108,106 @@ function updateUser(user) {
 
 function generateApiKey() {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    let key = '';
+    let key = 'bh_';
     for (let i = 0; i < 20; i++) key += chars.charAt(Math.floor(Math.random() * chars.length));
     return key;
 }
 
 function generateApiToken() {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    let token = '';
+    let token = 'tkn_';
     for (let i = 0; i < 40; i++) token += chars.charAt(Math.floor(Math.random() * chars.length));
     return token;
 }
 
-// API Endpoints
+// ✅ FIXED: Generate API Key - Creates user if not exists
 app.post('/api/generate-key', (req, res) => {
-    const { phone } = req.body;
+    const { phone, fullName, email } = req.body;
+    
+    console.log('📝 Generate Key Request:', { phone, fullName, email });
+    
     if (!phone) {
         return res.status(400).json({ success: false, message: 'Phone number is required' });
     }
-    const user = getUserByPhone(phone);
+    
+    // ✅ Check if user exists, if not create one
+    let user = getUserByPhone(phone);
+    
     if (!user) {
-        return res.status(404).json({ success: false, message: 'User not found' });
+        console.log('👤 User not found, creating new user:', phone);
+        // Create user with provided data or default
+        user = createOrUpdateUser({
+            phone: phone,
+            fullName: fullName || 'User',
+            email: email || '',
+            password: 'default123',
+            balance: 0,
+            createdAt: new Date().toISOString()
+        });
+        console.log('✅ New user created:', user);
     }
+    
+    // Generate new API keys
     const apiKey = generateApiKey();
     const apiToken = generateApiToken();
+    
     user.apiKey = apiKey;
     user.apiToken = apiToken;
     updateUser(user);
+    
+    console.log('✅ API Keys Generated:', { phone, apiKey, apiToken });
+    
     return res.json({
         success: true,
         message: 'API key generated successfully',
-        data: { apiKey, apiToken, phone: user.phone, name: user.fullName }
+        data: {
+            apiKey: apiKey,
+            apiToken: apiToken,
+            phone: user.phone,
+            name: user.fullName
+        }
     });
 });
 
+// ✅ FIXED: Balance API
 app.get('/api/balance', (req, res) => {
     const { apiKey, apiToken } = req.query;
+    
+    console.log('💰 Balance Check:', { apiKey, apiToken });
+    
     if (!apiKey || !apiToken) {
         return res.status(400).json({ success: false, message: 'API key and token are required' });
     }
+    
     const user = getUsers().find(u => u.apiKey === apiKey && u.apiToken === apiToken);
+    
     if (!user) {
+        console.log('❌ Invalid credentials for balance check');
         return res.status(401).json({ success: false, message: 'Invalid API credentials' });
     }
+    
     return res.json({
         success: true,
-        data: { phone: user.phone, name: user.fullName, balance: user.balance || 0, currency: 'INR' }
+        data: {
+            phone: user.phone,
+            name: user.fullName,
+            balance: user.balance || 0,
+            currency: 'INR'
+        }
     });
 });
 
+// ✅ FIXED: Payment API
 app.get('/APIs/api', async (req, res) => {
     const { token, key, paytoNumber, amount, comment } = req.query;
+
+    console.log('========================================');
+    console.log('📱 API Payment Request:');
+    console.log('Token:', token);
+    console.log('Key:', key);
+    console.log('PaytoNumber:', paytoNumber);
+    console.log('Amount:', amount);
+    console.log('========================================');
 
     if (!token || !key) {
         return res.status(400).json({ success: false, message: 'Missing API credentials' });
@@ -143,11 +230,32 @@ app.get('/APIs/api', async (req, res) => {
     }
 
     const users = getUsers();
+    
+    // ✅ Debug: Log all users for checking
+    console.log('👥 Total users in DB:', users.length);
+    users.forEach(u => {
+        console.log(`  - ${u.phone}: ${u.fullName} (API Key: ${u.apiKey ? '✅' : '❌'})`);
+    });
+    
+    // ✅ Find sender with exact match
     const sender = users.find(u => u.apiKey === key && u.apiToken === token);
 
     if (!sender) {
-        return res.status(401).json({ success: false, message: 'Invalid API credentials' });
+        console.log('❌ Invalid API credentials - Sender not found');
+        console.log(`  Received Key: ${key}`);
+        console.log(`  Received Token: ${token}`);
+        return res.status(401).json({ 
+            success: false, 
+            message: 'Invalid API credentials',
+            debug: {
+                providedKey: key,
+                providedToken: token,
+                userCount: users.length
+            }
+        });
     }
+
+    console.log('✅ Sender found:', sender.phone, sender.fullName);
 
     const senderBalance = sender.balance || 0;
     if (amountNum > senderBalance) {
@@ -198,6 +306,9 @@ app.get('/APIs/api', async (req, res) => {
 
     saveUsers(users);
 
+    console.log('✅ Payment processed successfully!');
+    console.log('========================================');
+
     return res.json({
         success: true,
         message: 'Payment successful',
@@ -230,6 +341,7 @@ app.get('/api/users', (req, res) => {
         name: u.fullName,
         email: u.email,
         balance: u.balance || 0,
+        hasApiKey: !!(u.apiKey && u.apiToken),
         createdAt: u.createdAt,
         loginCount: u.loginCount || 0
     }));
@@ -251,69 +363,37 @@ app.get('/api/status', (req, res) => {
             users: '/api/users',
             status: '/api/status'
         },
-        stats: { total_users: totalUsers, total_transactions: totalTransactions }
+        stats: { 
+            total_users: totalUsers, 
+            total_transactions: totalTransactions,
+            users_with_api: users.filter(u => u.apiKey).length
+        }
     });
 });
 
-// ✅ Serve HTML files for all routes
+// ✅ Serve HTML files
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-app.get('/dashboard', (req, res) => {
-    res.sendFile(path.join(__dirname, 'dashboard.html'));
-});
-
-app.get('/add-fund', (req, res) => {
-    res.sendFile(path.join(__dirname, 'add-fund.html'));
-});
-
-app.get('/api-keys', (req, res) => {
-    res.sendFile(path.join(__dirname, 'api-keys.html'));
-});
-
-app.get('/forgot-password', (req, res) => {
-    res.sendFile(path.join(__dirname, 'forgot-password.html'));
-});
-
-app.get('/owner-dashboard', (req, res) => {
-    res.sendFile(path.join(__dirname, 'owner-dashboard.html'));
-});
-
-app.get('/pay-user', (req, res) => {
-    res.sendFile(path.join(__dirname, 'pay-user.html'));
-});
-
-app.get('/profile', (req, res) => {
-    res.sendFile(path.join(__dirname, 'profile.html'));
-});
-
-app.get('/register', (req, res) => {
-    res.sendFile(path.join(__dirname, 'register.html'));
-});
-
-app.get('/settings', (req, res) => {
-    res.sendFile(path.join(__dirname, 'settings.html'));
-});
-
-app.get('/transaction-history', (req, res) => {
-    res.sendFile(path.join(__dirname, 'transaction-history.html'));
-});
-
-app.get('/withdraw', (req, res) => {
-    res.sendFile(path.join(__dirname, 'withdraw.html'));
-});
-
-// ✅ Catch-all for any other routes
 app.get('*', (req, res) => {
+    // If path has extension, try to serve static file
+    if (req.path.includes('.')) {
+        return res.status(404).send('File not found');
+    }
+    // Otherwise serve index.html for SPA routing
     res.sendFile(path.join(__dirname, 'index.html'));
 });
+
+// Initialize database
+initDB();
 
 // Start server
 app.listen(PORT, '0.0.0.0', () => {
     console.log('========================================');
     console.log('🚀 Bots Hub API Server Running');
     console.log(`📡 Port: ${PORT}`);
-    console.log(`🌐 URL: https://bots-hub-pay.onrender.com`);
+    console.log(`🌐 Domain: https://bots-hub-pay.onrender.com`);
+    console.log(`📊 Total Users in DB: ${getUsers().length}`);
     console.log('========================================');
 });
