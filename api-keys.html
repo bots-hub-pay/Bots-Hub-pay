@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Keys · Bots Hub</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
+    <link rel="stylesheet" href="css/page-style.css">
+    <link rel="stylesheet" href="css/api-keys-style.css">
+    <link rel="icon" href="assets/images/favicon.ico">
+</head>
+<body>
+    <div class="page-container">
+        <div class="page-card">
+            <div class="page-header">
+                <a href="dashboard.html" class="back-btn"><i class="fa-solid fa-arrow-left"></i></a>
+                <h1><i class="fa-solid fa-key" style="color:#ff9100;"></i> API Keys</h1>
+            </div>
+            <div class="page-body">
+                <div class="api-box api-status-box">
+                    <div class="api-box-header">
+                        <h3><i class="fa-solid fa-circle-check"></i> API Status</h3>
+                        <span class="status-badge" id="apiStatusBadge"><i class="fa-solid fa-circle"></i> Inactive</span>
+                    </div>
+                    <div class="api-box-body">
+                        <div class="status-info">
+                            <div class="status-item"><span class="status-label">Key Status</span><span class="status-value" id="keyStatus">Not Generated</span></div>
+                            <div class="status-item"><span class="status-label">Token Status</span><span class="status-value" id="tokenStatus">Not Generated</span></div>
+                            <div class="status-item"><span class="status-label">Requests Today</span><span class="status-value" id="requestsToday">0</span></div>
+                            <div class="status-item"><span class="status-label">Rate Limit</span><span class="status-value">100 / minute</span></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="api-box api-actions-box">
+                    <div class="api-box-header"><h3><i class="fa-solid fa-bolt"></i> Quick Actions</h3></div>
+                    <div class="api-box-body">
+                        <div class="action-grid">
+                            <button class="action-btn-card" id="generateKeyBtn"><i class="fa-solid fa-rotate"></i><span>Generate New Key</span></button>
+                            <button class="action-btn-card" id="copyApiBtn"><i class="fa-regular fa-copy"></i><span>Copy URL</span></button>
+                            <button class="action-btn-card" id="testApiBtn"><i class="fa-solid fa-play"></i><span>Test API</span></button>
+                            <button class="action-btn-card" id="revokeKeyBtn"><i class="fa-solid fa-ban"></i><span>Revoke Key</span></button>
+                        </div>
+                    </div>
+                </div>
+                <div class="api-box api-credentials-box">
+                    <div class="api-box-header">
+                        <h3><i class="fa-solid fa-shield-halved"></i> API Credentials</h3>
+                        <span class="credential-status" id="credentialStatus">🔒 Not Generated</span>
+                    </div>
+                    <div class="api-box-body">
+                        <div class="credential-field"><label>API Key</label><div class="credential-value"><span id="apiKeyValue">No key generated yet</span><button class="copy-field-btn" onclick="copyField('apiKeyValue')"><i class="fa-regular fa-copy"></i></button></div></div>
+                        <div class="credential-field"><label>API Token</label><div class="credential-value"><span id="apiTokenValue">No token generated yet</span><button class="copy-field-btn" onclick="copyField('apiTokenValue')"><i class="fa-regular fa-copy"></i></button></div></div>
+                        <div class="credential-field"><label>Domain</label><div class="credential-value"><span id="apiDomainValue">Loading...</span><button class="copy-field-btn" onclick="copyField('apiDomainValue')"><i class="fa-regular fa-copy"></i></button></div></div>
+                    </div>
+                </div>
+                <div class="api-box api-endpoint-box">
+                    <div class="api-box-header">
+                        <h3><i class="fa-solid fa-link"></i> API Endpoint</h3>
+                        <span class="endpoint-method">GET / POST</span>
+                    </div>
+                    <div class="api-box-body">
+                        <div class="endpoint-field"><label>Base URL</label><div class="endpoint-value" id="baseUrlDisplay">Loading...</div></div>
+                        <div class="endpoint-field"><label>Full Endpoint URL</label><div class="endpoint-value full-url" id="apiUrlDisplay">Generate API key to get URL</div></div>
+                        <div class="endpoint-field"><label>Example Request</label><div class="endpoint-value example-request" id="exampleUrl">Generate API key to see example</div></div>
+                        <div class="endpoint-params">
+                            <h4>Parameters</h4>
+                            <div class="param-grid">
+                                <div class="param-item"><span class="param-name">token</span><span class="param-type">string</span><span class="param-required">Required</span></div>
+                                <div class="param-item"><span class="param-name">key</span><span class="param-type">string</span><span class="param-required">Required</span></div>
+                                <div class="param-item"><span class="param-name">paytoNumber</span><span class="param-type">string</span><span class="param-required">Required</span></div>
+                                <div class="param-item"><span class="param-name">amount</span><span class="param-type">number</span><span class="param-required">Required</span></div>
+                                <div class="param-item"><span class="param-name">comment</span><span class="param-type">string</span><span class="param-optional">Optional</span></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="js/api-keys.js"></script>
+</body>
+</html>

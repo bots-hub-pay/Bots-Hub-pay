@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add Fund · Bots Hub</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
+    <link rel="stylesheet" href="css/page-style.css">
+    <link rel="stylesheet" href="css/add-fund-style.css">
+    <link rel="icon" href="assets/images/favicon.ico">
+</head>
+<body>
+    <div class="page-container">
+        <div class="page-card">
+            <div class="page-header">
+                <a href="dashboard.html" class="back-btn"><i class="fa-solid fa-arrow-left"></i></a>
+                <h1><i class="fa-solid fa-circle-plus" style="color:#00c853;"></i> Add Fund</h1>
+            </div>
+            <div class="page-body">
+                <div class="balance-display">
+                    <span>Current Balance</span>
+                    <h2 id="currentBalance">₹0.00</h2>
+                </div>
+
+                <!-- Step 1: Enter Amount -->
+                <div class="step-section" id="step1">
+                    <div class="step-header">
+                        <span class="step-number">1</span>
+                        <h3>Enter Amount</h3>
+                    </div>
+                    <div class="step-body">
+                        <div class="input-group">
+                            <label>Amount (₹ INR)</label>
+                            <input type="number" id="fundAmount" placeholder="Enter amount" min="1" step="1" required>
+                        </div>
+                        <div class="quick-amounts">
+                            <button type="button" class="quick-btn" data-amount="100">₹100</button>
+                            <button type="button" class="quick-btn" data-amount="500">₹500</button>
+                            <button type="button" class="quick-btn" data-amount="1000">₹1,000</button>
+                            <button type="button" class="quick-btn" data-amount="2000">₹2,000</button>
+                            <button type="button" class="quick-btn" data-amount="5000">₹5,000</button>
+                            <button type="button" class="quick-btn" data-amount="10000">₹10,000</button>
+                        </div>
+                        <button class="next-btn" id="step1Next">
+                            Next <i class="fa-solid fa-arrow-right"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Step 2: Payment Details with QR Code -->
+                <div class="step-section" id="step2" style="display:none;">
+                    <div class="step-header">
+                        <span class="step-number">2</span>
+                        <h3>Payment Details</h3>
+                    </div>
+                    <div class="step-body">
+                        <div class="qr-section">
+                            <div class="qr-container" id="qrContainer">
+                                <div id="qrPlaceholder" class="qr-placeholder">
+                                    <i class="fa-solid fa-qrcode"></i>
+                                    <span>Loading QR Code...</span>
+                                </div>
+                                <img id="qrImage" style="display:none;width:200px;height:200px;" alt="QR Code">
+                            </div>
+                            
+                            <!-- UPI Details -->
+                            <div class="upi-details">
+                                <div class="upi-detail-item">
+                                    <span class="label"><i class="fa-solid fa-credit-card"></i> UPI ID</span>
+                                    <span class="value">
+                                        <span id="upiId">botshub@pay</span>
+                                        <button class="copy-btn" onclick="copyText('upiId')">
+                                            <i class="fa-regular fa-copy"></i>
+                                        </button>
+                                        <span class="upi-badge">Primary</span>
+                                    </span>
+                                </div>
+                                <div class="upi-detail-item">
+                                    <span class="label"><i class="fa-solid fa-money-bill-wave"></i> Amount</span>
+                                    <span class="value" id="displayAmount">₹0</span>
+                                </div>
+                                <div class="upi-detail-item">
+                                    <span class="label"><i class="fa-solid fa-user"></i> Payee Name</span>
+                                    <span class="value" id="payeeName">Bots Hub Pay</span>
+                                </div>
+                                <div class="upi-detail-item">
+                                    <span class="label"><i class="fa-solid fa-hashtag"></i> Reference</span>
+                                    <span class="value" id="referenceId">Loading...</span>
+                                </div>
+                            </div>
+
+                            <!-- UPI Actions -->
+                            <div class="upi-actions">
+                                <button class="upi-action-btn" onclick="copyUPIId()">
+                                    <i class="fa-regular fa-copy"></i> Copy UPI
+                                </button>
+                                <button class="upi-action-btn" onclick="openUPIApp()">
+                                    <i class="fa-solid fa-phone"></i> Pay with UPI
+                                </button>
+                                <button class="upi-action-btn primary" onclick="downloadQR()">
+                                    <i class="fa-solid fa-download"></i> Download QR
+                                </button>
+                            </div>
+
+                            <!-- Owner Controls for QR/UPI -->
+                            <div class="owner-controls" id="ownerControls">
+                                <h4><i class="fa-solid fa-crown" style="color:#ff9100;"></i> Owner Controls</h4>
+                                <div class="control-row">
+                                    <input type="text" id="upiInput" placeholder="Change UPI ID" value="botshub@pay">
+                                    <button class="success" onclick="updateUPI()">
+                                        <i class="fa-solid fa-check"></i> Update UPI
+                                    </button>
+                                </div>
+                                <div class="control-row">
+                                    <input type="text" id="payeeNameInput" placeholder="Change Payee Name" value="Bots Hub Pay">
+                                    <button class="success" onclick="updatePayeeName()">
+                                        <i class="fa-solid fa-check"></i> Update Name
+                                    </button>
+                                </div>
+                                <div class="control-row">
+                                    <div class="qr-upload-area" onclick="document.getElementById('qrUpload').click()">
+                                        <i class="fa-solid fa-upload"></i>
+                                        <p>Click to upload QR Code image</p>
+                                        <input type="file" id="qrUpload" accept="image/*">
+                                    </div>
+                                    <button class="danger" onclick="resetQR()">
+                                        <i class="fa-solid fa-rotate"></i> Reset QR
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <button class="back-btn-step" id="step2Back">
+                            <i class="fa-solid fa-arrow-left"></i> Back
+                        </button>
+                        <button class="next-btn" id="step2Next">
+                            I've Made Payment <i class="fa-solid fa-arrow-right"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Step 3: Enter UTR ID -->
+                <div class="step-section" id="step3" style="display:none;">
+                    <div class="step-header">
+                        <span class="step-number">3</span>
+                        <h3>Confirm Payment</h3>
+                    </div>
+                    <div class="step-body">
+                        <div class="form-group">
+                            <label>UTR / Transaction ID</label>
+                            <input type="text" id="utrId" placeholder="Enter UTR number (e.g., UTR123456789)" required>
+                            <span class="helper-text">Enter the UTR number from your bank/UPI app</span>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Transaction PIN (4 digits)</label>
+                            <input type="password" id="fundPin" placeholder="Enter 4-digit PIN" maxlength="4" pattern="[0-9]{4}" required>
+                        </div>
+                        
+                        <div class="confirmation-summary">
+                            <div class="summary-item">
+                                <span>Amount</span>
+                                <span id="summaryAmount">₹0</span>
+                            </div>
+                            <div class="summary-item">
+                                <span>UTR ID</span>
+                                <span id="summaryUtr">-</span>
+                            </div>
+                            <div class="summary-item">
+                                <span>Reference</span>
+                                <span id="summaryRef">-</span>
+                            </div>
+                        </div>
+                        
+                        <button class="back-btn-step" id="step3Back">
+                            <i class="fa-solid fa-arrow-left"></i> Back
+                        </button>
+                        <button class="submit-btn" id="submitFundBtn">
+                            <i class="fa-solid fa-circle-check"></i> Submit Request
+                        </button>
+                        
+                        <p style="text-align:center;font-size:0.75rem;color:#6b7280;margin-top:0.5rem;">
+                            <i class="fa-regular fa-clock"></i> Request will be verified by owner
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Progress Indicator -->
+                <div class="progress-indicator">
+                    <div class="progress-step active" id="progress1">
+                        <span class="progress-number">1</span>
+                        <span class="progress-label">Amount</span>
+                    </div>
+                    <div class="progress-line" id="progressLine1"></div>
+                    <div class="progress-step" id="progress2">
+                        <span class="progress-number">2</span>
+                        <span class="progress-label">Payment</span>
+                    </div>
+                    <div class="progress-line" id="progressLine2"></div>
+                    <div class="progress-step" id="progress3">
+                        <span class="progress-number">3</span>
+                        <span class="progress-label">Confirm</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="js/add-fund.js"></script>
+</body>
+</html>
