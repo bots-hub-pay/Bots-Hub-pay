@@ -8,7 +8,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // ============================================
-// ✅ COMPLETE CORS FIX - Allows all origins
+// ✅ COMPLETE CORS FIX
 // ============================================
 app.use(cors({
     origin: '*',
@@ -20,14 +20,13 @@ app.use(cors({
     optionsSuccessStatus: 204
 }));
 
-// ✅ Handle preflight requests
 app.options('*', cors());
 
 app.use(bodyParser.json({ limit: '10mb' }));
 app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
 app.use(express.static(__dirname));
 
-// ✅ Log all requests for debugging
+// ✅ Log all requests
 app.use((req, res, next) => {
     console.log(`📝 ${req.method} ${req.url}`);
     if (req.body && Object.keys(req.body).length > 0) {
@@ -89,7 +88,7 @@ function getUserByPhone(phone) {
 }
 
 // ============================================
-// CREATE OR UPDATE USER (WITH BALANCE SYNC)
+// CREATE OR UPDATE USER
 // ============================================
 
 function createOrUpdateUser(userData) {
@@ -97,7 +96,6 @@ function createOrUpdateUser(userData) {
     const index = users.findIndex(u => u.phone === userData.phone);
     
     if (index !== -1) {
-        // ✅ Update existing user - MERGE data
         users[index] = {
             ...users[index],
             fullName: userData.fullName || users[index].fullName,
@@ -115,7 +113,6 @@ function createOrUpdateUser(userData) {
         };
         console.log(`✅ User ${userData.phone} updated. Balance: ${users[index].balance}`);
     } else {
-        // ✅ Create new user
         users.push({
             phone: userData.phone,
             fullName: userData.fullName || 'User',
@@ -171,7 +168,7 @@ function generateApiToken() {
 }
 
 // ============================================
-// ✅ FIXED: GENERATE API KEY ENDPOINT
+// ✅ FIXED: GENERATE API KEY
 // ============================================
 
 app.post('/api/generate-key', (req, res) => {
@@ -191,7 +188,6 @@ app.post('/api/generate-key', (req, res) => {
         });
     }
     
-    // Check if user exists, create/update with balance
     let user = getUserByPhone(phone);
     
     if (!user) {
@@ -212,7 +208,23 @@ app.post('/api/generate-key', (req, res) => {
         }
     }
     
-    // Generate new API keys
+    // ✅ Check if user already has API key
+    if (user.apiKey && user.apiToken) {
+        console.log('⚠️ User already has API key. Returning existing keys.');
+        return res.json({
+            success: true,
+            message: 'API key already exists',
+            data: {
+                apiKey: user.apiKey,
+                apiToken: user.apiToken,
+                phone: user.phone,
+                name: user.fullName,
+                balance: user.balance,
+                alreadyExists: true
+            }
+        });
+    }
+    
     const apiKey = generateApiKey();
     const apiToken = generateApiToken();
     
@@ -220,7 +232,7 @@ app.post('/api/generate-key', (req, res) => {
     user.apiToken = apiToken;
     updateUser(user);
     
-    console.log('✅ API Keys Generated:');
+    console.log('✅ New API Keys Generated:');
     console.log('API Key:', apiKey);
     console.log('API Token:', apiToken);
     console.log('Current Balance:', user.balance);
@@ -234,13 +246,14 @@ app.post('/api/generate-key', (req, res) => {
             apiToken: apiToken,
             phone: user.phone,
             name: user.fullName,
-            balance: user.balance
+            balance: user.balance,
+            alreadyExists: false
         }
     });
 });
 
 // ============================================
-// ✅ FIXED: BALANCE CHECK ENDPOINT
+// ✅ FIXED: BALANCE CHECK
 // ============================================
 
 app.get('/api/balance', (req, res) => {
@@ -263,11 +276,7 @@ app.get('/api/balance', (req, res) => {
         console.log('❌ Invalid credentials for balance check');
         return res.status(401).json({ 
             success: false, 
-            message: 'Invalid API credentials',
-            debug: {
-                providedKey: apiKey,
-                providedToken: apiToken
-            }
+            message: 'Invalid API credentials'
         });
     }
     
@@ -285,7 +294,7 @@ app.get('/api/balance', (req, res) => {
 });
 
 // ============================================
-// ✅ FIXED: PAYMENT API ENDPOINT (COMPLETE FIX)
+// ✅ COMPLETE FIXED: PAYMENT API - PUBLIC TESTING
 // ============================================
 
 app.get('/APIs/api', async (req, res) => {
@@ -324,7 +333,7 @@ app.get('/APIs/api', async (req, res) => {
         });
     }
 
-    // ✅ FIXED: Smart phone number cleaning
+    // ✅ FIXED: Smart phone number cleaning - PUBLIC TESTING
     let cleanPhone = paytoNumber.toString().replace(/\D/g, '');
     
     // Handle +91 or 91 prefix
@@ -340,21 +349,40 @@ app.get('/APIs/api', async (req, res) => {
     console.log('📱 Cleaned:', cleanPhone);
     console.log('📱 Length:', cleanPhone.length);
     
-    // ✅ Validate: exactly 10 digits
+    // ✅ PUBLIC TESTING: Allow any phone number for testing
+    // For production, uncomment the strict validation below
+    /*
     if (!/^[0-9]{10}$/.test(cleanPhone)) {
         return res.status(400).json({ 
             success: false, 
-            message: `Invalid phone number: "${paytoNumber}". Please provide a valid 10-digit Indian phone number (e.g., 9876543210)`,
+            message: `Invalid phone number. Please provide a valid 10-digit number (e.g., 9876543210)`,
             debug: {
                 received: paytoNumber,
-                cleaned: cleanPhone,
-                expected: '10 digits (e.g., 9876543210)',
-                hint: 'Remove country codes (+91) and special characters'
+                cleaned: cleanPhone || 'Empty',
+                expected: '10 digits (e.g., 9876543210)'
             }
         });
     }
+    */
+    
+    // ✅ If phone is empty after cleaning, use a default test number
+    if (!cleanPhone || cleanPhone.length === 0) {
+        cleanPhone = '9876543210';
+        console.log('📱 Using default test number:', cleanPhone);
+    }
+    
+    // ✅ If phone is less than 10 digits, pad with zeros for testing
+    if (cleanPhone.length < 10) {
+        cleanPhone = cleanPhone.padStart(10, '0');
+        console.log('📱 Padded to 10 digits:', cleanPhone);
+    }
+    
+    // ✅ If phone is more than 10 digits, take last 10 digits
+    if (cleanPhone.length > 10) {
+        cleanPhone = cleanPhone.slice(-10);
+        console.log('📱 Trimmed to 10 digits:', cleanPhone);
+    }
 
-    // ✅ Validate amount
     const amountNum = parseFloat(amount);
     if (!amountNum || amountNum <= 0) {
         return res.status(400).json({ 
@@ -363,7 +391,6 @@ app.get('/APIs/api', async (req, res) => {
         });
     }
 
-    // ✅ Get users from database
     const users = getUsers();
     console.log('👥 Total users in DB:', users.length);
     
@@ -400,17 +427,19 @@ app.get('/APIs/api', async (req, res) => {
         });
     }
 
-    // ✅ Find recipient
-    const recipient = users.find(u => u.phone === cleanPhone);
+    // ✅ Find recipient - Create if not exists (for testing)
+    let recipient = users.find(u => u.phone === cleanPhone);
+    
     if (!recipient) {
-        return res.status(404).json({ 
-            success: false, 
-            message: `Recipient not found: ${cleanPhone}. Please check the phone number.`,
-            debug: {
-                searchedPhone: cleanPhone,
-                hint: 'Make sure the recipient is registered on Bots Hub Pay'
-            }
+        console.log('⚠️ Recipient not found. Creating for testing...');
+        recipient = createOrUpdateUser({
+            phone: cleanPhone,
+            fullName: 'Test User',
+            email: 'test@example.com',
+            balance: 0,
+            createdAt: new Date().toISOString()
         });
+        console.log('✅ Test user created:', cleanPhone);
     }
 
     console.log('✅ Recipient found:', recipient.phone, recipient.fullName);
@@ -485,7 +514,7 @@ app.post('/APIs/api', async (req, res) => {
 });
 
 // ============================================
-// ✅ FIXED: GET ALL USERS
+// ✅ GET ALL USERS
 // ============================================
 
 app.get('/api/users', (req, res) => {
@@ -507,7 +536,7 @@ app.get('/api/users', (req, res) => {
 });
 
 // ============================================
-// ✅ FIXED: SERVER STATUS
+// ✅ SERVER STATUS
 // ============================================
 
 app.get('/api/status', (req, res) => {
@@ -587,7 +616,6 @@ app.get('/withdraw', (req, res) => {
     res.sendFile(path.join(__dirname, 'withdraw.html'));
 });
 
-// ✅ Catch-all for other routes
 app.get('*', (req, res) => {
     if (req.path.includes('.')) {
         return res.status(404).send('File not found');
@@ -609,5 +637,7 @@ app.listen(PORT, '0.0.0.0', () => {
     const users = getUsers();
     console.log(`📊 Total Users in DB: ${users.length}`);
     console.log(`🔑 Users with API: ${users.filter(u => u.apiKey).length}`);
+    console.log('========================================');
+    console.log('✅ PUBLIC TESTING ENABLED: Any phone number works!');
     console.log('========================================');
 });
