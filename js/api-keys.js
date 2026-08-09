@@ -1,4 +1,4 @@
-// API Keys JavaScript - Bots Hub Pay (COMPLETE FIXED)
+// API Keys JavaScript - Bots Hub Pay (FIXED with LocalStorage Sync)
 
 const FULL_DOMAIN = 'https://bots-hub-pay.onrender.com';
 
@@ -80,7 +80,7 @@ function loadApiKeys() {
 
 function setupEventListeners(currentUser) {
     
-    // ✅ FIXED: Generate API Key with Balance Sync
+    // Generate API Key
     document.getElementById('generateKeyBtn').addEventListener('click', async function() {
         if (currentUser.apiKey) {
             if (!confirm('⚠️ You already have an API key. Generating a new one will revoke the old key.\n\nContinue?')) {
@@ -114,10 +114,13 @@ function setupEventListeners(currentUser) {
                     users[index].balance = data.data.balance;
                     localStorage.setItem('users', JSON.stringify(users));
                     currentUser = users[index];
+                    
+                    // ✅ Update session
+                    sessionStorage.setItem('userBalance', data.data.balance);
                 }
                 
                 loadApiKeys();
-                showToast(`✅ API key generated!`, 'success');
+                showToast(`✅ API key generated! Balance: ₹${data.data.balance}`, 'success');
             } else {
                 showToast('❌ ' + data.message, 'error');
             }
@@ -127,7 +130,7 @@ function setupEventListeners(currentUser) {
         }
     });
 
-    // ✅ FIXED: Test API with Balance Check
+    // ✅ FIXED: Test API with LocalStorage Sync
     document.getElementById('testApiBtn').addEventListener('click', async function() {
         if (!currentUser.apiKey || !currentUser.apiToken) {
             showToast('Please generate an API key first', 'error');
@@ -137,7 +140,7 @@ function setupEventListeners(currentUser) {
         showToast('⏳ Checking balance...', 'info');
 
         try {
-            // ✅ First check balance on server
+            // ✅ Check balance from server
             const balanceResponse = await fetch(
                 `${FULL_DOMAIN}/api/balance?apiKey=${currentUser.apiKey}&apiToken=${currentUser.apiToken}`
             );
@@ -150,6 +153,15 @@ function setupEventListeners(currentUser) {
 
             const serverBalance = balanceData.data.balance;
             console.log('💰 Server Balance:', serverBalance);
+            
+            // ✅ Update localStorage with server balance
+            const users = JSON.parse(localStorage.getItem('users') || '[]');
+            const index = users.findIndex(u => u.phone === currentUser.phone);
+            if (index !== -1) {
+                users[index].balance = serverBalance;
+                localStorage.setItem('users', JSON.stringify(users));
+                currentUser.balance = serverBalance;
+            }
 
             if (serverBalance < 1) {
                 showToast(`❌ Insufficient balance: ₹${serverBalance}. Please add funds first.`, 'error');
@@ -184,20 +196,31 @@ function setupEventListeners(currentUser) {
             
             if (data.success) {
                 showToast(`✅ Payment Successful!`, 'success');
-                // ✅ Update local balance
-                const users = JSON.parse(localStorage.getItem('users') || '[]');
-                const index = users.findIndex(u => u.phone === currentUser.phone);
-                if (index !== -1) {
-                    // Get updated balance from server
-                    const newBalance = await fetch(
-                        `${FULL_DOMAIN}/api/balance?apiKey=${currentUser.apiKey}&apiToken=${currentUser.apiToken}`
-                    );
-                    const newBalanceData = await newBalance.json();
-                    if (newBalanceData.success) {
-                        users[index].balance = newBalanceData.data.balance;
+                
+                // ✅ IMPORTANT: Sync localStorage with server after payment
+                const syncResponse = await fetch(
+                    `${FULL_DOMAIN}/api/balance?apiKey=${currentUser.apiKey}&apiToken=${currentUser.apiToken}`
+                );
+                const syncData = await syncResponse.json();
+                
+                if (syncData.success) {
+                    // ✅ Update localStorage with new balance
+                    const users = JSON.parse(localStorage.getItem('users') || '[]');
+                    const index = users.findIndex(u => u.phone === currentUser.phone);
+                    if (index !== -1) {
+                        users[index].balance = syncData.data.balance;
+                        // ✅ Also get transactions from server
+                        const txResponse = await fetch(`${FULL_DOMAIN}/api/transactions/${currentUser.phone}`);
+                        const txData = await txResponse.json();
+                        if (txData.success) {
+                            users[index].transactions = txData.transactions;
+                        }
                         localStorage.setItem('users', JSON.stringify(users));
                         currentUser = users[index];
                     }
+                    
+                    // ✅ Update dashboard balance display
+                    updateDashboardBalance(syncData.data.balance);
                 }
             } else {
                 showToast('❌ ' + data.message, 'error');
@@ -244,9 +267,17 @@ function setupEventListeners(currentUser) {
     });
 }
 
-// ============================================
-// HELPER FUNCTIONS
-// ============================================
+// ✅ NEW: Update dashboard balance
+function updateDashboardBalance(balance) {
+    // Update all balance displays
+    const elements = ['userBalance', 'totalBalance', 'addFundBalance', 'withdrawBalance', 'payBalance'];
+    elements.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.textContent = '₹' + (balance || 0).toFixed(2);
+        }
+    });
+}
 
 function updateUserInDatabase(user) {
     const users = JSON.parse(localStorage.getItem('users') || '[]');
