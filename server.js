@@ -8,7 +8,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // ============================================
-// ✅ COMPLETE CORS FIX
+// CORS CONFIGURATION
 // ============================================
 app.use(cors({
     origin: '*',
@@ -26,15 +26,9 @@ app.use(bodyParser.json({ limit: '10mb' }));
 app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
 app.use(express.static(__dirname));
 
-// ✅ Log all requests
+// Log all requests
 app.use((req, res, next) => {
     console.log(`📝 ${req.method} ${req.url}`);
-    if (req.body && Object.keys(req.body).length > 0) {
-        console.log('Body:', req.body);
-    }
-    if (req.query && Object.keys(req.query).length > 0) {
-        console.log('Query:', req.query);
-    }
     next();
 });
 
@@ -80,7 +74,6 @@ function saveUsers(users) {
     const db = getDB();
     db.users = users;
     saveDB(db);
-    console.log('✅ Users saved to database');
 }
 
 function getUserByPhone(phone) {
@@ -112,7 +105,7 @@ function createOrUpdateUser(userData) {
             activities: userData.activities || users[index].activities || [],
             pendingApprovals: userData.pendingApprovals || users[index].pendingApprovals || []
         };
-        console.log(`✅ User ${userData.phone} updated. Balance: ${users[index].balance}`);
+        console.log(`✅ User ${userData.phone} updated`);
     } else {
         users.push({
             phone: userData.phone,
@@ -120,19 +113,19 @@ function createOrUpdateUser(userData) {
             email: userData.email || '',
             password: userData.password || 'default123',
             balance: userData.balance || 0,
-            totalFundAdded: userData.totalFundAdded || 0,
-            totalWithdrawn: userData.totalWithdrawn || 0,
-            totalSent: userData.totalSent || 0,
-            totalReceived: userData.totalReceived || 0,
-            apiKey: userData.apiKey || null,
-            apiToken: userData.apiToken || null,
+            totalFundAdded: 0,
+            totalWithdrawn: 0,
+            totalSent: 0,
+            totalReceived: 0,
+            apiKey: null,
+            apiToken: null,
             isActive: true,
-            createdAt: userData.createdAt || new Date().toISOString(),
-            transactions: userData.transactions || [],
-            activities: userData.activities || [],
-            pendingApprovals: userData.pendingApprovals || []
+            createdAt: new Date().toISOString(),
+            transactions: [],
+            activities: [],
+            pendingApprovals: []
         });
-        console.log(`✅ New user ${userData.phone} created. Balance: ${userData.balance || 0}`);
+        console.log(`✅ New user ${userData.phone} created`);
     }
     
     saveUsers(users);
@@ -157,30 +150,30 @@ function updateUser(user) {
 function generateApiKey() {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
     let key = 'bh_';
-    for (let i = 0; i < 20; i++) key += chars.charAt(Math.floor(Math.random() * chars.length));
+    for (let i = 0; i < 20; i++) {
+        key += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
     return key;
 }
 
 function generateApiToken() {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
     let token = 'tkn_';
-    for (let i = 0; i < 40; i++) token += chars.charAt(Math.floor(Math.random() * chars.length));
+    for (let i = 0; i < 40; i++) {
+        token += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
     return token;
 }
 
 // ============================================
-// ✅ FIXED: GENERATE API KEY
+// API ENDPOINTS
 // ============================================
 
+// Generate API Key
 app.post('/api/generate-key', (req, res) => {
     const { phone, fullName, email, balance } = req.body;
     
-    console.log('========================================');
-    console.log('📝 Generate Key Request:');
-    console.log('Phone:', phone);
-    console.log('FullName:', fullName);
-    console.log('Balance:', balance);
-    console.log('========================================');
+    console.log('📝 Generate Key Request:', phone);
     
     if (!phone) {
         return res.status(400).json({ 
@@ -196,21 +189,16 @@ app.post('/api/generate-key', (req, res) => {
             phone: phone,
             fullName: fullName || 'User',
             email: email || '',
-            password: 'default123',
-            balance: balance || 0,
-            createdAt: new Date().toISOString()
+            balance: balance || 0
         });
-        console.log('✅ New user created with balance:', balance || 0);
     } else {
         if (balance !== undefined && balance !== null) {
             user.balance = balance;
             updateUser(user);
-            console.log('✅ User balance updated to:', balance);
         }
     }
     
     if (user.apiKey && user.apiToken) {
-        console.log('⚠️ User already has API key. Returning existing keys.');
         return res.json({
             success: true,
             message: 'API key already exists',
@@ -232,12 +220,6 @@ app.post('/api/generate-key', (req, res) => {
     user.apiToken = apiToken;
     updateUser(user);
     
-    console.log('✅ New API Keys Generated:');
-    console.log('API Key:', apiKey);
-    console.log('API Token:', apiToken);
-    console.log('Current Balance:', user.balance);
-    console.log('========================================');
-    
     return res.json({
         success: true,
         message: 'API key generated successfully',
@@ -252,16 +234,9 @@ app.post('/api/generate-key', (req, res) => {
     });
 });
 
-// ============================================
-// ✅ FIXED: BALANCE CHECK
-// ============================================
-
+// Check Balance
 app.get('/api/balance', (req, res) => {
     const { apiKey, apiToken } = req.query;
-    
-    console.log('💰 Balance Check Request:');
-    console.log('API Key:', apiKey);
-    console.log('API Token:', apiToken);
     
     if (!apiKey || !apiToken) {
         return res.status(400).json({ 
@@ -273,14 +248,11 @@ app.get('/api/balance', (req, res) => {
     const user = getUsers().find(u => u.apiKey === apiKey && u.apiToken === apiToken);
     
     if (!user) {
-        console.log('❌ Invalid credentials for balance check');
         return res.status(401).json({ 
             success: false, 
             message: 'Invalid API credentials'
         });
     }
-    
-    console.log('✅ Balance found:', user.balance);
     
     return res.json({
         success: true,
@@ -293,23 +265,12 @@ app.get('/api/balance', (req, res) => {
     });
 });
 
-// ============================================
-// ✅ COMPLETE FIXED: PAYMENT API - Recipient Gets Money
-// ============================================
-
+// Payment API
 app.get('/APIs/api', async (req, res) => {
     const { token, key, paytoNumber, amount, comment } = req.query;
 
-    console.log('========================================');
-    console.log('📱 API Payment Request:');
-    console.log('Token:', token);
-    console.log('Key:', key);
-    console.log('PaytoNumber:', paytoNumber);
-    console.log('Amount:', amount);
-    console.log('Comment:', comment);
-    console.log('========================================');
+    console.log('📱 Payment Request:', { token, key, paytoNumber, amount });
 
-    // ✅ Validate required fields
     if (!token || !key) {
         return res.status(400).json({ 
             success: false, 
@@ -331,7 +292,7 @@ app.get('/APIs/api', async (req, res) => {
         });
     }
 
-    // ✅ Clean phone number
+    // Clean phone number
     let cleanPhone = paytoNumber.toString().replace(/\D/g, '');
     
     if (cleanPhone.startsWith('91') && cleanPhone.length === 12) {
@@ -341,23 +302,16 @@ app.get('/APIs/api', async (req, res) => {
         cleanPhone = cleanPhone.substring(1);
     }
     
-    console.log('📱 Original:', paytoNumber);
-    console.log('📱 Cleaned Phone:', cleanPhone);
-    
-    // ✅ Validate phone number
     if (!cleanPhone || cleanPhone.length === 0) {
         cleanPhone = '9876543210';
-        console.log('📱 Using default test number:', cleanPhone);
     }
     
     if (cleanPhone.length < 10) {
         cleanPhone = cleanPhone.padStart(10, '0');
-        console.log('📱 Padded to 10 digits:', cleanPhone);
     }
     
     if (cleanPhone.length > 10) {
         cleanPhone = cleanPhone.slice(-10);
-        console.log('📱 Trimmed to 10 digits:', cleanPhone);
     }
 
     const amountNum = parseFloat(amount);
@@ -368,28 +322,20 @@ app.get('/APIs/api', async (req, res) => {
         });
     }
 
-    // ✅ Get all users from database
     let users = getUsers();
-    console.log('👥 Total users in DB:', users.length);
     
-    // ✅ Find sender
+    // Find sender
     let sender = users.find(u => u.apiKey === key && u.apiToken === token);
 
     if (!sender) {
-        console.log('❌ Invalid API credentials');
         return res.status(401).json({ 
             success: false, 
             message: 'Invalid API credentials' 
         });
     }
 
-    console.log('✅ Sender found:', sender.phone, sender.fullName);
-    console.log('💰 Sender Balance Before:', sender.balance);
-
-    // ✅ Check sender balance
     const senderBalance = sender.balance || 0;
     if (amountNum > senderBalance) {
-        console.log('❌ Insufficient balance. Have:', senderBalance, 'Need:', amountNum);
         return res.status(400).json({
             success: false,
             message: 'Insufficient balance',
@@ -401,11 +347,10 @@ app.get('/APIs/api', async (req, res) => {
         });
     }
 
-    // ✅ Find OR Create recipient
+    // Find OR Create recipient
     let recipient = users.find(u => u.phone === cleanPhone);
     
     if (!recipient) {
-        console.log('⚠️ Recipient not found. Creating new user...');
         recipient = {
             phone: cleanPhone,
             fullName: 'Test User',
@@ -426,29 +371,22 @@ app.get('/APIs/api', async (req, res) => {
         };
         users.push(recipient);
         saveUsers(users);
-        console.log('✅ New recipient created:', cleanPhone);
     }
 
-    // ✅ Refresh users array after potential creation
+    // Refresh users
     users = getUsers();
     sender = users.find(u => u.apiKey === key && u.apiToken === token);
     recipient = users.find(u => u.phone === cleanPhone);
 
-    console.log('✅ Recipient found:', recipient.phone, recipient.fullName);
-    console.log('💰 Recipient Balance Before:', recipient.balance);
-
-    // ✅ PROCESS PAYMENT - DEDUCT FROM SENDER
+    // Process payment - DEDUCT FROM SENDER
     sender.balance = (sender.balance || 0) - amountNum;
     sender.totalSent = (sender.totalSent || 0) + amountNum;
 
-    // ✅ PROCESS PAYMENT - ADD TO RECIPIENT
+    // Process payment - ADD TO RECIPIENT
     recipient.balance = (recipient.balance || 0) + amountNum;
     recipient.totalReceived = (recipient.totalReceived || 0) + amountNum;
 
-    console.log('💰 Sender Balance After:', sender.balance);
-    console.log('💰 Recipient Balance After:', recipient.balance);
-
-    // ✅ Create transaction for sender
+    // Create transaction for sender
     const senderTx = {
         type: 'sent',
         amount: amountNum,
@@ -459,7 +397,7 @@ app.get('/APIs/api', async (req, res) => {
     if (!sender.transactions) sender.transactions = [];
     sender.transactions.unshift(senderTx);
 
-    // ✅ Create transaction for recipient
+    // Create transaction for recipient
     const recipientTx = {
         type: 'received',
         amount: amountNum,
@@ -470,45 +408,31 @@ app.get('/APIs/api', async (req, res) => {
     if (!recipient.transactions) recipient.transactions = [];
     recipient.transactions.unshift(recipientTx);
 
-    // ✅ Update users in database
+    // Update users in database
     const senderIndex = users.findIndex(u => u.phone === sender.phone);
     const recipientIndex = users.findIndex(u => u.phone === recipient.phone);
 
     if (senderIndex !== -1) users[senderIndex] = sender;
     if (recipientIndex !== -1) users[recipientIndex] = recipient;
 
-    // ✅ SAVE TO DATABASE
     saveUsers(users);
-    
-    // ✅ Verify save
-    const verifyUsers = getUsers();
-    const verifySender = verifyUsers.find(u => u.phone === sender.phone);
-    const verifyRecipient = verifyUsers.find(u => u.phone === recipient.phone);
-    
-    console.log('✅ Verification - Sender Balance:', verifySender?.balance);
-    console.log('✅ Verification - Recipient Balance:', verifyRecipient?.balance);
 
     console.log('✅ Payment processed successfully!');
-    console.log('========================================');
 
-    // ✅ Success response
     return res.json({
         success: true,
         message: '✅ Payment Successful!'
     });
 });
 
-// ✅ Support POST method for API
+// POST support for API
 app.post('/APIs/api', async (req, res) => {
     const { token, key, paytoNumber, amount, comment } = req.body;
     req.query = { token, key, paytoNumber, amount, comment };
     app._router.handle(req, res);
 });
 
-// ============================================
-// ✅ GET ALL USERS
-// ============================================
-
+// Get all users
 app.get('/api/users', (req, res) => {
     const users = getUsers();
     const safeUsers = users.map(u => ({
@@ -517,8 +441,7 @@ app.get('/api/users', (req, res) => {
         email: u.email,
         balance: u.balance || 0,
         hasApiKey: !!(u.apiKey && u.apiToken),
-        createdAt: u.createdAt,
-        loginCount: u.loginCount || 0
+        createdAt: u.createdAt
     }));
     res.json({ 
         success: true, 
@@ -527,10 +450,7 @@ app.get('/api/users', (req, res) => {
     });
 });
 
-// ============================================
-// ✅ SERVER STATUS
-// ============================================
-
+// Server status
 app.get('/api/status', (req, res) => {
     const users = getUsers();
     const totalUsers = users.length;
@@ -608,6 +528,7 @@ app.get('/withdraw', (req, res) => {
     res.sendFile(path.join(__dirname, 'withdraw.html'));
 });
 
+// Catch all
 app.get('*', (req, res) => {
     if (req.path.includes('.')) {
         return res.status(404).send('File not found');
@@ -627,8 +548,7 @@ app.listen(PORT, '0.0.0.0', () => {
     console.log(`📡 Port: ${PORT}`);
     console.log(`🌐 URL: https://bots-hub-pay.onrender.com`);
     const users = getUsers();
-    console.log(`📊 Total Users in DB: ${users.length}`);
+    console.log(`📊 Total Users: ${users.length}`);
     console.log(`🔑 Users with API: ${users.filter(u => u.apiKey).length}`);
     console.log('========================================');
-    console.log('✅ Payment System: Sender Deduct + Recipient Add');
-  
+});
