@@ -43,7 +43,6 @@ document.addEventListener('DOMContentLoaded', function() {
             apiKeyValue.textContent = currentUser.apiKey;
             apiTokenValue.textContent = currentUser.apiToken;
 
-            // ✅ CORRECT API URL FORMAT
             const fullUrl = `${FULL_DOMAIN}/APIs/api?token=${currentUser.apiToken}&key=${currentUser.apiKey}&paytoNumber={number}&amount={amount}&comment={comment}`;
             apiUrlDisplay.textContent = fullUrl;
             
@@ -71,7 +70,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     loadApiKeys();
 
-    // ✅ FIXED: Generate New API Key with Server Sync
+    // ✅ FIXED: Generate API Key with server sync
     document.getElementById('generateKeyBtn').addEventListener('click', async function() {
         if (currentUser.apiKey) {
             if (!confirm('⚠️ You already have an API key. Generating a new one will revoke the old key.\n\nContinue?')) {
@@ -79,18 +78,25 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
 
-        // ✅ Generate through server API
+        showToast('⏳ Generating API key...', 'info');
+
         try {
+            // ✅ Send phone number to server
             const response = await fetch(`${FULL_DOMAIN}/api/generate-key`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ phone: currentUser.phone })
+                body: JSON.stringify({ 
+                    phone: currentUser.phone,
+                    fullName: currentUser.fullName || 'User',
+                    email: currentUser.email || ''
+                })
             });
             
             const data = await response.json();
+            console.log('Server Response:', data);
             
             if (data.success) {
-                // Update local user data
+                // ✅ Update local user data
                 const users = JSON.parse(localStorage.getItem('users') || '[]');
                 const index = users.findIndex(u => u.phone === currentUser.phone);
                 if (index !== -1) {
@@ -98,6 +104,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     users[index].apiToken = data.data.apiToken;
                     localStorage.setItem('users', JSON.stringify(users));
                     currentUser = users[index];
+                    
+                    // ✅ Update session
+                    sessionStorage.setItem('userApiKey', data.data.apiKey);
+                    sessionStorage.setItem('userApiToken', data.data.apiToken);
                 }
                 
                 loadApiKeys();
@@ -111,16 +121,35 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // ✅ FIXED: Test API with proper credentials
+    // ✅ FIXED: Test API with proper validation
     document.getElementById('testApiBtn').addEventListener('click', async function() {
         if (!currentUser.apiKey || !currentUser.apiToken) {
             showToast('Please generate an API key first', 'error');
             return;
         }
 
+        // ✅ First check if user has balance
+        const checkBalance = await fetch(`${FULL_DOMAIN}/api/balance?apiKey=${currentUser.apiKey}&apiToken=${currentUser.apiToken}`);
+        const balanceData = await checkBalance.json();
+        
+        if (!balanceData.success) {
+            showToast('❌ Invalid API credentials. Please regenerate key.', 'error');
+            return;
+        }
+
+        if (balanceData.data.balance < 1) {
+            showToast('❌ Insufficient balance. Please add funds first.', 'error');
+            return;
+        }
+
         const testAmount = prompt('Enter test amount to pay (₹):', '10');
         if (!testAmount || isNaN(testAmount) || parseFloat(testAmount) <= 0) {
             showToast('Invalid amount', 'error');
+            return;
+        }
+
+        if (parseFloat(testAmount) > balanceData.data.balance) {
+            showToast('❌ Amount exceeds balance: ₹' + balanceData.data.balance, 'error');
             return;
         }
 
@@ -151,7 +180,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // ✅ Copy API URL
+    // Copy API URL
     document.getElementById('copyApiBtn').addEventListener('click', function() {
         if (!currentUser.apiKey || !currentUser.apiToken) {
             showToast('Please generate an API key first', 'error');
@@ -171,7 +200,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // ✅ Revoke API Key
+    // Revoke API Key
     document.getElementById('revokeKeyBtn').addEventListener('click', async function() {
         if (!currentUser.apiKey) {
             showToast('No API key to revoke', 'error');
@@ -181,6 +210,11 @@ document.addEventListener('DOMContentLoaded', function() {
             currentUser.apiKey = null;
             currentUser.apiToken = null;
             updateUserInDatabase(currentUser);
+            
+            // ✅ Also clear from session
+            sessionStorage.removeItem('userApiKey');
+            sessionStorage.removeItem('userApiToken');
+            
             loadApiKeys();
             showToast('❌ API key revoked', 'error');
         }
