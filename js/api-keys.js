@@ -1,5 +1,7 @@
 // API Keys JavaScript - Bots Hub Pay (FIXED)
 
+const FULL_DOMAIN = 'https://bots-hub-pay.onrender.com';
+
 document.addEventListener('DOMContentLoaded', function() {
     const isLoggedIn = sessionStorage.getItem('isLoggedIn');
     if (!isLoggedIn) {
@@ -17,60 +19,68 @@ document.addEventListener('DOMContentLoaded', function() {
         return;
     }
 
-    const FULL_DOMAIN = 'https://bots-hub-pay.onrender.com';
-
-    function loadApiKeys() {
-        const hasKey = currentUser.apiKey && currentUser.apiToken;
-        const badge = document.getElementById('apiStatusBadge');
-        const keyStatus = document.getElementById('keyStatus');
-        const tokenStatus = document.getElementById('tokenStatus');
-        const credentialStatus = document.getElementById('credentialStatus');
-        const apiKeyValue = document.getElementById('apiKeyValue');
-        const apiTokenValue = document.getElementById('apiTokenValue');
-        const apiUrlDisplay = document.getElementById('apiUrlDisplay');
-        const exampleUrl = document.getElementById('exampleUrl');
-        const baseUrlDisplay = document.getElementById('baseUrlDisplay');
-
-        baseUrlDisplay.textContent = FULL_DOMAIN;
-
-        if (hasKey) {
-            badge.className = 'status-badge active';
-            badge.innerHTML = '<i class="fa-solid fa-circle"></i> Active';
-            keyStatus.textContent = '✅ Generated';
-            tokenStatus.textContent = '✅ Generated';
-            credentialStatus.textContent = '🔓 Active';
-            credentialStatus.className = 'credential-status active';
-            apiKeyValue.textContent = currentUser.apiKey;
-            apiTokenValue.textContent = currentUser.apiToken;
-
-            const fullUrl = `${FULL_DOMAIN}/APIs/api?token=${currentUser.apiToken}&key=${currentUser.apiKey}&paytoNumber={number}&amount={amount}&comment={comment}`;
-            apiUrlDisplay.textContent = fullUrl;
-            
-            const example = fullUrl
-                .replace('{number}', '9876543210')
-                .replace('{amount}', '100')
-                .replace('{comment}', 'Payment');
-            exampleUrl.textContent = example;
-            
-            document.getElementById('requestsToday').textContent = Math.floor(Math.random() * 100);
-        } else {
-            badge.className = 'status-badge inactive';
-            badge.innerHTML = '<i class="fa-solid fa-circle"></i> Inactive';
-            keyStatus.textContent = 'Not Generated';
-            tokenStatus.textContent = 'Not Generated';
-            credentialStatus.textContent = '🔒 Not Generated';
-            credentialStatus.className = 'credential-status';
-            apiKeyValue.textContent = 'No key generated yet';
-            apiTokenValue.textContent = 'No token generated yet';
-            apiUrlDisplay.textContent = 'Generate API key to get URL';
-            exampleUrl.textContent = 'Generate API key to see example';
-            document.getElementById('requestsToday').textContent = '0';
-        }
-    }
-
     loadApiKeys();
+    setupEventListeners(currentUser);
+});
 
-    // ✅ FIXED: Generate API Key with server sync
+function loadApiKeys() {
+    const userPhone = sessionStorage.getItem('userPhone');
+    const users = JSON.parse(localStorage.getItem('users') || '[]');
+    const currentUser = users.find(user => user.phone === userPhone);
+    
+    if (!currentUser) return;
+
+    const hasKey = currentUser.apiKey && currentUser.apiToken;
+    const badge = document.getElementById('apiStatusBadge');
+    const keyStatus = document.getElementById('keyStatus');
+    const tokenStatus = document.getElementById('tokenStatus');
+    const credentialStatus = document.getElementById('credentialStatus');
+    const apiKeyValue = document.getElementById('apiKeyValue');
+    const apiTokenValue = document.getElementById('apiTokenValue');
+    const apiUrlDisplay = document.getElementById('apiUrlDisplay');
+    const exampleUrl = document.getElementById('exampleUrl');
+    const baseUrlDisplay = document.getElementById('baseUrlDisplay');
+
+    baseUrlDisplay.textContent = FULL_DOMAIN;
+
+    if (hasKey) {
+        badge.className = 'status-badge active';
+        badge.innerHTML = '<i class="fa-solid fa-circle"></i> Active';
+        keyStatus.textContent = '✅ Generated';
+        tokenStatus.textContent = '✅ Generated';
+        credentialStatus.textContent = '🔓 Active';
+        credentialStatus.className = 'credential-status active';
+        apiKeyValue.textContent = currentUser.apiKey;
+        apiTokenValue.textContent = currentUser.apiToken;
+
+        const fullUrl = `${FULL_DOMAIN}/APIs/api?token=${currentUser.apiToken}&key=${currentUser.apiKey}&paytoNumber={number}&amount={amount}&comment={comment}`;
+        apiUrlDisplay.textContent = fullUrl;
+        
+        const example = fullUrl
+            .replace('{number}', '9876543210')
+            .replace('{amount}', '100')
+            .replace('{comment}', 'Payment');
+        exampleUrl.textContent = example;
+        
+        document.getElementById('requestsToday').textContent = Math.floor(Math.random() * 100);
+    } else {
+        badge.className = 'status-badge inactive';
+        badge.innerHTML = '<i class="fa-solid fa-circle"></i> Inactive';
+        keyStatus.textContent = 'Not Generated';
+        tokenStatus.textContent = 'Not Generated';
+        credentialStatus.textContent = '🔒 Not Generated';
+        credentialStatus.className = 'credential-status';
+        apiKeyValue.textContent = 'No key generated yet';
+        apiTokenValue.textContent = 'No token generated yet';
+        apiUrlDisplay.textContent = 'Generate API key to get URL';
+        exampleUrl.textContent = 'Generate API key to see example';
+        document.getElementById('requestsToday').textContent = '0';
+    }
+}
+
+function setupEventListeners(currentUser) {
+    
+    // ✅ FIXED: Generate API Key with Balance Sync
     document.getElementById('generateKeyBtn').addEventListener('click', async function() {
         if (currentUser.apiKey) {
             if (!confirm('⚠️ You already have an API key. Generating a new one will revoke the old key.\n\nContinue?')) {
@@ -81,14 +91,14 @@ document.addEventListener('DOMContentLoaded', function() {
         showToast('⏳ Generating API key...', 'info');
 
         try {
-            // ✅ Send phone number to server
             const response = await fetch(`${FULL_DOMAIN}/api/generate-key`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
                     phone: currentUser.phone,
                     fullName: currentUser.fullName || 'User',
-                    email: currentUser.email || ''
+                    email: currentUser.email || '',
+                    balance: currentUser.balance || 0  // ✅ Send balance to server
                 })
             });
             
@@ -102,16 +112,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (index !== -1) {
                     users[index].apiKey = data.data.apiKey;
                     users[index].apiToken = data.data.apiToken;
+                    users[index].balance = data.data.balance;  // ✅ Update balance from server
                     localStorage.setItem('users', JSON.stringify(users));
                     currentUser = users[index];
-                    
-                    // ✅ Update session
-                    sessionStorage.setItem('userApiKey', data.data.apiKey);
-                    sessionStorage.setItem('userApiToken', data.data.apiToken);
                 }
                 
                 loadApiKeys();
-                showToast('✅ New API key generated successfully!', 'success');
+                showToast(`✅ API key generated! Balance: ₹${data.data.balance}`, 'success');
             } else {
                 showToast('❌ ' + data.message, 'error');
             }
@@ -121,56 +128,71 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // ✅ FIXED: Test API with proper validation
+    // ✅ FIXED: Test API with Balance Check
     document.getElementById('testApiBtn').addEventListener('click', async function() {
         if (!currentUser.apiKey || !currentUser.apiToken) {
             showToast('Please generate an API key first', 'error');
             return;
         }
 
-        // ✅ First check if user has balance
-        const checkBalance = await fetch(`${FULL_DOMAIN}/api/balance?apiKey=${currentUser.apiKey}&apiToken=${currentUser.apiToken}`);
-        const balanceData = await checkBalance.json();
-        
-        if (!balanceData.success) {
-            showToast('❌ Invalid API credentials. Please regenerate key.', 'error');
-            return;
-        }
-
-        if (balanceData.data.balance < 1) {
-            showToast('❌ Insufficient balance. Please add funds first.', 'error');
-            return;
-        }
-
-        const testAmount = prompt('Enter test amount to pay (₹):', '10');
-        if (!testAmount || isNaN(testAmount) || parseFloat(testAmount) <= 0) {
-            showToast('Invalid amount', 'error');
-            return;
-        }
-
-        if (parseFloat(testAmount) > balanceData.data.balance) {
-            showToast('❌ Amount exceeds balance: ₹' + balanceData.data.balance, 'error');
-            return;
-        }
-
-        const testPhone = prompt('Enter recipient phone number for test:', '9876543210');
-        if (!testPhone || testPhone.length !== 10) {
-            showToast('Please enter a valid 10-digit phone number', 'error');
-            return;
-        }
-
-        const testComment = prompt('Enter comment (optional):', 'API Test Payment');
-        showToast('🔍 Processing test payment...', 'info');
-
-        // ✅ Correct API URL with credentials
-        const apiUrl = `${FULL_DOMAIN}/APIs/api?token=${currentUser.apiToken}&key=${currentUser.apiKey}&paytoNumber=${testPhone}&amount=${testAmount}&comment=${encodeURIComponent(testComment || 'Test')}`;
+        showToast('⏳ Checking balance...', 'info');
 
         try {
+            // ✅ First check balance on server
+            const balanceResponse = await fetch(
+                `${FULL_DOMAIN}/api/balance?apiKey=${currentUser.apiKey}&apiToken=${currentUser.apiToken}`
+            );
+            const balanceData = await balanceResponse.json();
+            
+            if (!balanceData.success) {
+                showToast('❌ Invalid API credentials. Please regenerate key.', 'error');
+                return;
+            }
+
+            const serverBalance = balanceData.data.balance;
+            console.log('💰 Server Balance:', serverBalance);
+
+            if (serverBalance < 1) {
+                showToast(`❌ Insufficient balance: ₹${serverBalance}. Please add funds first.`, 'error');
+                return;
+            }
+
+            const testAmount = prompt(`Enter test amount (Balance: ₹${serverBalance}):`, Math.min(10, serverBalance).toString());
+            if (!testAmount || isNaN(testAmount) || parseFloat(testAmount) <= 0) {
+                showToast('Invalid amount', 'error');
+                return;
+            }
+
+            if (parseFloat(testAmount) > serverBalance) {
+                showToast(`❌ Amount exceeds balance: ₹${serverBalance}`, 'error');
+                return;
+            }
+
+            const testPhone = prompt('Enter recipient phone number:', '9876543210');
+            if (!testPhone || testPhone.length !== 10) {
+                showToast('Please enter a valid 10-digit phone number', 'error');
+                return;
+            }
+
+            const testComment = prompt('Enter comment (optional):', 'API Test Payment');
+            showToast('🔍 Processing test payment...', 'info');
+
+            // ✅ Make API call
+            const apiUrl = `${FULL_DOMAIN}/APIs/api?token=${currentUser.apiToken}&key=${currentUser.apiKey}&paytoNumber=${testPhone}&amount=${testAmount}&comment=${encodeURIComponent(testComment || 'Test')}`;
+
             const response = await fetch(apiUrl);
             const data = await response.json();
             
             if (data.success) {
                 showToast(`✅ ₹${testAmount} sent to ${data.data.recipient_name || testPhone} successfully!`, 'success');
+                // ✅ Update local balance
+                const users = JSON.parse(localStorage.getItem('users') || '[]');
+                const index = users.findIndex(u => u.phone === currentUser.phone);
+                if (index !== -1) {
+                    users[index].balance = data.data.sender_balance_after;
+                    localStorage.setItem('users', JSON.stringify(users));
+                    currentUser = users[index];
+                }
             } else {
                 showToast('❌ ' + data.message, 'error');
             }
@@ -210,16 +232,15 @@ document.addEventListener('DOMContentLoaded', function() {
             currentUser.apiKey = null;
             currentUser.apiToken = null;
             updateUserInDatabase(currentUser);
-            
-            // ✅ Also clear from session
-            sessionStorage.removeItem('userApiKey');
-            sessionStorage.removeItem('userApiToken');
-            
             loadApiKeys();
             showToast('❌ API key revoked', 'error');
         }
     });
-});
+}
+
+// ============================================
+// HELPER FUNCTIONS
+// ============================================
 
 function updateUserInDatabase(user) {
     const users = JSON.parse(localStorage.getItem('users') || '[]');
