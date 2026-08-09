@@ -27,7 +27,7 @@ app.use(express.static(__dirname));
 const DB_PATH = path.join(__dirname, 'database.json');
 
 // ============================================
-// ✅ FIXED: DATABASE FUNCTIONS - No duplicate
+// DATABASE FUNCTIONS
 // ============================================
 
 function initDB() {
@@ -59,7 +59,6 @@ function readDB() {
 
 function writeDB(data) {
     try {
-        // Preserve meta data
         if (!data._meta) {
             data._meta = {
                 updated: new Date().toISOString(),
@@ -89,12 +88,11 @@ function saveUsers(users) {
 
 function getUserByPhone(phone) {
     const users = getUsers();
-    // ✅ FIXED: String comparison
     return users.find(u => String(u.phone) === String(phone));
 }
 
 // ============================================
-// ✅ FIXED: CREATE OR UPDATE USER - No duplicate
+// CREATE OR UPDATE USER
 // ============================================
 
 function createOrUpdateUser(userData) {
@@ -103,7 +101,6 @@ function createOrUpdateUser(userData) {
     const index = users.findIndex(u => String(u.phone) === phoneStr);
     
     if (index !== -1) {
-        // ✅ UPDATE EXISTING USER - Keep all data
         const existing = users[index];
         users[index] = {
             ...existing,
@@ -122,7 +119,6 @@ function createOrUpdateUser(userData) {
         };
         console.log(`✅ User ${phoneStr} UPDATED. Balance: ${users[index].balance}`);
     } else {
-        // ✅ CREATE NEW USER
         users.push({
             phone: phoneStr,
             fullName: userData.fullName || 'User',
@@ -273,7 +269,7 @@ app.get('/api/balance', (req, res) => {
 });
 
 // ============================================
-// ✅ FIXED: PAYMENT API - No duplicate users
+// ✅ FIXED: PAYMENT API - Sender Name & Phone
 // ============================================
 
 app.get('/APIs/api', async (req, res) => {
@@ -336,7 +332,7 @@ app.get('/APIs/api', async (req, res) => {
         });
     }
 
-    // ✅ FIND RECIPIENT - Don't create if not exists
+    // ✅ Find recipient
     let recipient = users.find(u => String(u.phone) === String(cleanPhone));
     
     if (!recipient) {
@@ -352,28 +348,25 @@ app.get('/APIs/api', async (req, res) => {
     console.log('💰 Recipient Balance Before:', recipient.balance);
 
     // ✅ PROCESS PAYMENT
-    // 1. Deduct from sender
     sender.balance = (sender.balance || 0) - amountNum;
     sender.totalSent = (sender.totalSent || 0) + amountNum;
 
-    // 2. Add to recipient
     recipient.balance = (recipient.balance || 0) + amountNum;
     recipient.totalReceived = (recipient.totalReceived || 0) + amountNum;
 
     console.log('💰 Sender Balance After:', sender.balance);
     console.log('💰 Recipient Balance After:', recipient.balance);
 
-    // ✅ CREATE TRANSACTION FOR SENDER (Only once)
+    // ✅ CREATE TRANSACTION FOR SENDER - With Recipient Details
     const senderTx = {
         id: Date.now().toString() + '_sender',
         type: 'sent',
         amount: amountNum,
-        description: `💰 Sent to ${recipient.fullName || cleanPhone}${comment ? ' - ' + comment : ''}`,
+        description: `API Payment to ${recipient.fullName || 'User'} (${recipient.phone})`,
         time: new Date().toISOString(),
         status: 'completed'
     };
     if (!sender.transactions) sender.transactions = [];
-    // ✅ Check if transaction already exists
     const existingSenderTx = sender.transactions.find(t => 
         t.amount === amountNum && 
         t.type === 'sent' && 
@@ -381,22 +374,21 @@ app.get('/APIs/api', async (req, res) => {
     );
     if (!existingSenderTx) {
         sender.transactions.unshift(senderTx);
-        console.log('✅ Sender transaction added');
+        console.log('✅ Sender transaction added: API Payment to', recipient.fullName);
     } else {
         console.log('⚠️ Sender transaction already exists, skipping');
     }
 
-    // ✅ CREATE TRANSACTION FOR RECIPIENT (Only once)
+    // ✅ CREATE TRANSACTION FOR RECIPIENT - With Sender Details
     const recipientTx = {
         id: Date.now().toString() + '_recipient',
         type: 'received',
         amount: amountNum,
-        description: `💰 Received from ${sender.fullName || sender.phone}${comment ? ' - ' + comment : ''}`,
+        description: `API Payment from ${sender.fullName || 'User'} (${sender.phone})`,
         time: new Date().toISOString(),
         status: 'completed'
     };
     if (!recipient.transactions) recipient.transactions = [];
-    // ✅ Check if transaction already exists
     const existingRecipientTx = recipient.transactions.find(t => 
         t.amount === amountNum && 
         t.type === 'received' && 
@@ -404,7 +396,7 @@ app.get('/APIs/api', async (req, res) => {
     );
     if (!existingRecipientTx) {
         recipient.transactions.unshift(recipientTx);
-        console.log('✅ Recipient transaction added');
+        console.log('✅ Recipient transaction added: API Payment from', sender.fullName);
     } else {
         console.log('⚠️ Recipient transaction already exists, skipping');
     }
@@ -577,6 +569,8 @@ app.listen(PORT, '0.0.0.0', () => {
     console.log(`🔑 Users with API: ${users.filter(u => u.apiKey).length}`);
     console.log(`📝 Total Transactions: ${users.reduce((sum, u) => sum + (u.transactions || []).length, 0)}`);
     console.log('========================================');
-    console.log('✅ FIXED: No duplicate users, no duplicate transactions');
+    console.log('✅ FIXED: Transaction with Sender Details');
+    console.log('   Sender: "API Payment to [Recipient Name] ([Phone])"');
+    console.log('   Recipient: "API Payment from [Sender Name] ([Phone])"');
     console.log('========================================');
 });
