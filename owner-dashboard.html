@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Owner Dashboard · Bots Hub</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
+    <link rel="stylesheet" href="css/dashboard-style.css">
+    <link rel="icon" href="assets/images/favicon.ico">
+    <style>
+        .owner-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 1.5rem;
+        }
+        .owner-header {
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+            color: #fff;
+            padding: 1.5rem 2rem;
+            border-radius: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+        .owner-header h1 { display: flex; align-items: center; gap: 0.8rem; }
+        .owner-header h1 i { color: #ffd700; }
+        .owner-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        .owner-stat-card {
+            background: #fff;
+            padding: 1.2rem;
+            border-radius: 14px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            text-align: center;
+        }
+        .owner-stat-card .number { font-size: 2rem; font-weight: 700; color: #1a1a2e; }
+        .owner-stat-card .label { font-size: 0.85rem; color: #6b7280; margin-top: 0.3rem; }
+        .owner-stat-card .icon { font-size: 2rem; margin-bottom: 0.5rem; }
+        .approvals-section {
+            background: #fff;
+            border-radius: 16px;
+            padding: 1.5rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            margin-bottom: 2rem;
+        }
+        .approvals-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+        .approvals-header h2 { display: flex; align-items: center; gap: 0.8rem; }
+        .approvals-header h2 i { color: #ff9100; }
+        .approval-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem;
+            border: 1px solid #e5e9f0;
+            border-radius: 10px;
+            margin-bottom: 0.8rem;
+            transition: background 0.3s ease;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+        .approval-item:hover { background: #f8fafc; }
+        .approval-info { display: flex; flex-direction: column; gap: 0.2rem; }
+        .approval-info .type { font-weight: 600; color: #1a1a2e; }
+        .approval-info .details { font-size: 0.85rem; color: #6b7280; }
+        .approval-info .details span { font-weight: 500; color: #1a1a2e; }
+        .approval-actions { display: flex; gap: 0.5rem; }
+        .approve-btn, .reject-btn {
+            padding: 0.4rem 1.2rem;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: transform 0.3s ease;
+        }
+        .approve-btn { background: #00c853; color: #fff; }
+        .approve-btn:hover { transform: scale(1.05); }
+        .reject-btn { background: #ff1744; color: #fff; }
+        .reject-btn:hover { transform: scale(1.05); }
+        .pending-badge { background: #ff9100; color: #fff; padding: 0.2rem 0.8rem; border-radius: 20px; font-size: 0.75rem; font-weight: 600; }
+        .actions-section {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        .action-card {
+            background: #fff;
+            padding: 1.5rem;
+            border-radius: 14px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            text-align: center;
+        }
+        .action-card h3 { margin-bottom: 0.5rem; }
+        .action-card p { color: #6b7280; font-size: 0.9rem; margin-bottom: 1rem; }
+        .danger-btn { background: #ff1744; color: #fff; border: none; padding: 0.6rem 1.5rem; border-radius: 10px; cursor: pointer; font-weight: 600; transition: transform 0.3s ease; }
+        .danger-btn:hover { transform: translateY(-2px); }
+        .clear-btn { background: #ff9100; color: #fff; border: none; padding: 0.6rem 1.5rem; border-radius: 10px; cursor: pointer; font-weight: 600; transition: transform 0.3s ease; }
+        .clear-btn:hover { transform: translateY(-2px); }
+        .back-to-login {
+            background: #4169ff;
+            color: #fff;
+            text-decoration: none;
+            padding: 0.6rem 1.5rem;
+            border-radius: 10px;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: transform 0.3s ease;
+            cursor: pointer;
+            border: none;
+            font-size: 1rem;
+        }
+        .back-to-login:hover { transform: translateY(-2px); }
+        .no-approvals { text-align: center; padding: 2rem; color: #6b7280; }
+        .no-approvals i { font-size: 3rem; opacity: 0.3; margin-bottom: 1rem; }
+        @media (max-width: 768px) {
+            .owner-header { flex-direction: column; text-align: center; }
+            .approval-item { flex-direction: column; text-align: center; }
+            .approval-actions { width: 100%; justify-content: center; }
+        }
+    </style>
+</head>
+<body>
+    <div class="owner-dashboard-page" style="display:none;min-height:100vh;background:#f0f2f5;">
+        <div class="owner-container">
+            <div class="owner-header">
+                <h1><i class="fa-solid fa-crown"></i> Owner Dashboard</h1>
+                <div style="display:flex;gap:0.8rem;flex-wrap:wrap;">
+                    <span style="background:rgba(255,255,255,0.1);padding:0.4rem 1rem;border-radius:8px;">
+                        <i class="fa-solid fa-phone"></i> 8824146248
+                    </span>
+                    <button class="back-to-login" onclick="logoutOwner()">
+                        <i class="fa-solid fa-arrow-left"></i> Logout
+                    </button>
+                </div>
+            </div>
+            <div class="owner-stats" id="ownerStats">
+                <div class="owner-stat-card"><div class="icon">👥</div><div class="number" id="totalUsers">0</div><div class="label">Total Users</div></div>
+                <div class="owner-stat-card"><div class="icon">💰</div><div class="number" id="totalFunds">₹0</div><div class="label">Total Funds Added</div></div>
+                <div class="owner-stat-card"><div class="icon">📊</div><div class="number" id="totalTransactions">0</div><div class="label">Total Transactions</div></div>
+                <div class="owner-stat-card"><div class="icon">⏳</div><div class="number" id="pendingApprovals">0</div><div class="label">Pending Approvals</div></div>
+            </div>
+            <div class="actions-section">
+                <div class="action-card">
+                    <h3><i class="fa-solid fa-trash" style="color:#ff1744;"></i> Clear All Data</h3>
+                    <p>Permanently delete all user data, transactions, and approvals.</p>
+                    <button class="danger-btn" id="clearAllBtn"><i class="fa-solid fa-triangle-exclamation"></i> Clear All Data</button>
+                </div>
+                <div class="action-card">
+                    <h3><i class="fa-solid fa-user-slash" style="color:#ff9100;"></i> Clear One User</h3>
+                    <p>Enter user phone number to delete specific user data.</p>
+                    <div style="display:flex;gap:0.5rem;flex-wrap:wrap;justify-content:center;">
+                        <input type="tel" id="clearUserPhone" placeholder="Enter phone number" style="padding:0.5rem 1rem;border:1.5px solid #e5e9f0;border-radius:8px;flex:1;min-width:150px;">
+                        <button class="clear-btn" id="clearUserBtn"><i class="fa-solid fa-user-slash"></i> Clear</button>
+                    </div>
+                </div>
+            </div>
+            <div class="approvals-section">
+                <div class="approvals-header">
+                    <h2><i class="fa-solid fa-clock"></i> Pending Approvals</h2>
+                    <span style="font-size:0.9rem;color:#6b7280;" id="pendingCount">0 pending</span>
+                </div>
+                <div id="approvalsList">
+                    <div class="no-approvals"><i class="fa-regular fa-circle-check"></i><p>No pending approvals</p></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="js/owner-dashboard.js"></script>
+</body>
+</html>

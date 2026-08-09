@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profile · Bots Hub</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
+    <link rel="stylesheet" href="css/page-style.css">
+    <link rel="icon" href="assets/images/favicon.ico">
+</head>
+<body>
+    <div class="page-container">
+        <div class="page-card">
+            <div class="page-header">
+                <a href="dashboard.html" class="back-btn"><i class="fa-solid fa-arrow-left"></i></a>
+                <h1><i class="fa-solid fa-user" style="color:#4169ff;"></i> Edit Profile</h1>
+            </div>
+            <div class="page-body">
+                <div class="profile-avatar-large" id="profileAvatar" style="width:80px;height:80px;border-radius:50%;background:linear-gradient(135deg,#4169ff,#6a4bff);display:flex;align-items:center;justify-content:center;font-size:2.5rem;color:#fff;margin:0 auto 1.5rem;">
+                    <span id="avatarText">U</span>
+                </div>
+                <form id="editProfileForm">
+                    <div class="input-group">
+                        <label>Full Name</label>
+                        <input type="text" id="editFullName" required>
+                    </div>
+                    <div class="input-group">
+                        <label>Email Address</label>
+                        <input type="email" id="editEmail" required>
+                    </div>
+                    <div class="input-group">
+                        <label>Phone Number (Cannot be changed)</label>
+                        <input type="tel" id="editPhone" disabled>
+                    </div>
+                    <div class="input-group">
+                        <label>New Password (leave blank to keep current)</label>
+                        <input type="password" id="editPassword" placeholder="Enter new password (min 6 characters)">
+                    </div>
+                    <button type="submit" class="btn-primary">
+                        <i class="fa-solid fa-floppy-disk"></i> Save Changes
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    <script src="js/profile.js"></script>
+</body>
+</html>

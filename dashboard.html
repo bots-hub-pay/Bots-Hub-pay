@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bots Hub Pay · Dashboard</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
+    <link rel="stylesheet" href="css/dashboard-style.css">
+    <link rel="icon" href="assets/images/favicon.ico">
+</head>
+<body>
+    <div class="dashboard-page" id="dashboardPage">
+        <div class="sidebar-overlay" id="sidebarOverlay"></div>
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-logo">
+                    <i class="fa-solid fa-robot"></i>
+                    <span>Bots Hub Pay</span>
+                </div>
+                <button class="close-sidebar" id="closeSidebar"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <nav class="sidebar-nav">
+                <button class="nav-item active" data-page="dashboard" onclick="showDashboardSection('dashboard')">
+                    <i class="fa-solid fa-gauge-high"></i> <span>Dashboard</span>
+                </button>
+                <button class="nav-item" data-page="profile" onclick="showDashboardSection('profile')">
+                    <i class="fa-solid fa-user"></i> <span>Profile</span>
+                </button>
+                <button class="nav-item" data-page="add-fund" onclick="showDashboardSection('add-fund')">
+                    <i class="fa-solid fa-circle-plus"></i> <span>Add Fund</span>
+                </button>
+                <button class="nav-item" data-page="withdraw" onclick="showDashboardSection('withdraw')">
+                    <i class="fa-solid fa-arrow-right"></i> <span>Withdraw</span>
+                </button>
+                <button class="nav-item" data-page="pay-user" onclick="showDashboardSection('pay-user')">
+                    <i class="fa-solid fa-paper-plane"></i> <span>Pay to User</span>
+                </button>
+                <button class="nav-item" data-page="api-keys" onclick="showDashboardSection('api-keys')">
+                    <i class="fa-solid fa-key"></i> <span>API Keys</span>
+                </button>
+                <button class="nav-item" data-page="transaction-history" onclick="showDashboardSection('transaction-history')">
+                    <i class="fa-solid fa-clock-rotate-left"></i> <span>Transaction History</span>
+                </button>
+                <button class="nav-item" data-page="settings" onclick="showDashboardSection('settings')">
+                    <i class="fa-solid fa-gear"></i> <span>Settings</span>
+                </button>
+            </nav>
+            <div class="sidebar-footer">
+                <button class="logout-btn" id="logoutBtn"><i class="fa-solid fa-right-from-bracket"></i> Logout</button>
+            </div>
+        </aside>
+        <main class="main-content">
+            <header class="dashboard-header">
+                <div class="header-left">
+                    <button class="menu-toggle" id="menuToggle"><i class="fa-solid fa-bars"></i></button>
+                    <div class="header-title">
+                        <h1>Bots Hub Pay</h1>
+                        <p class="header-subtitle" id="pageTitle">Dashboard</p>
+                    </div>
+                </div>
+                <div class="header-right">
+                    <div class="balance-box">
+                        <i class="fa-solid fa-wallet"></i>
+                        <div class="balance-info">
+                            <span class="balance-label">Balance</span>
+                            <span class="balance-amount" id="userBalance">₹0.00</span>
+                        </div>
+                    </div>
+                    <button class="profile-btn" id="profileBtn"><i class="fa-solid fa-user"></i><span id="profileInitials">U</span></button>
+                </div>
+            </header>
+            <!-- Dashboard Content -->
+            <div id="dashboardContent">
+                <section class="stats-grid">
+                    <div class="stat-card"><div class="stat-icon blue"><i class="fa-solid fa-coins"></i></div><div class="stat-info"><h3>Total Balance</h3><p class="stat-number" id="totalBalance">₹0.00</p></div></div>
+                    <div class="stat-card"><div class="stat-icon green"><i class="fa-solid fa-circle-plus"></i></div><div class="stat-info"><h3>Fund Added</h3><p class="stat-number" id="totalFundAdded">₹0.00</p></div></div>
+                    <div class="stat-card"><div class="stat-icon orange"><i class="fa-solid fa-arrow-right"></i></div><div class="stat-info"><h3>Total Withdrawn</h3><p class="stat-number" id="totalWithdrawn">₹0.00</p></div></div>
+                    <div class="stat-card"><div class="stat-icon purple"><i class="fa-solid fa-arrow-left"></i></div><div class="stat-info"><h3>Total Sent</h3><p class="stat-number" id="totalSent">₹0.00</p></div></div>
+                    <div class="stat-card"><div class="stat-icon red"><i class="fa-solid fa-arrow-up"></i></div><div class="stat-info"><h3>Total Received</h3><p class="stat-number" id="totalReceived">₹0.00</p></div></div>
+                    <div class="stat-card"><div class="stat-icon pink"><i class="fa-solid fa-arrow-trend-up"></i></div><div class="stat-info"><h3>Total Transactions</h3><p class="stat-number" id="totalTransactions">0</p></div></div>
+                </section>
+                <section class="activity-section">
+                    <div class="activity-header">
+                        <h2><i class="fa-regular fa-clock"></i> Recent Activity</h2>
+                        <button class="view-all-btn" onclick="showDashboardSection('transaction-history')">View All <i class="fa-solid fa-arrow-right"></i></button>
+                    </div>
+                    <div class="activity-list" id="activityList"><div class="empty-activity"><i class="fa-regular fa-clock"></i><p>No activity yet.</p></div></div>
+                </section>
+            </div>
+            <!-- Other sections will be added via JavaScript -->
+        </main>
+    </div>
+    <div class="modal" id="profileModal">
+        <div class="modal-content">
+            <div class="modal-header"><h2><i class="fa-solid fa-user"></i> Profile Information</h2><button class="modal-close" id="closeModal">&times;</button></div>
+            <div class="modal-body">
+                <div class="profile-avatar"><span id="modalAvatar">U</span></div>
+                <div class="profile-details">
+                    <div class="detail-row"><span class="detail-label"><i class="fa-solid fa-user"></i> Full Name</span><span class="detail-value" id="modalName">N/A</span></div>
+                    <div class="detail-row"><span class="detail-label"><i class="fa-solid fa-phone"></i> Phone Number</span><span class="detail-value" id="modalPhone">N/A</span></div>
+                    <div class="detail-row"><span class="detail-label"><i class="fa-regular fa-envelope"></i> Email Address</span><span class="detail-value" id="modalEmail">N/A</span></div>
+                    <div class="detail-row"><span class="detail-label"><i class="fa-regular fa-calendar"></i> Member Since</span><span class="detail-value" id="modalMemberSince">N/A</span></div>
+                    <div class="detail-row"><span class="detail-label"><i class="fa-solid fa-coins"></i> Balance</span><span class="detail-value" id="modalBalance">₹0.00</span></div>
+                </div>
+                <button class="btn-primary" onclick="showDashboardSection('profile');closeProfileModal();"><i class="fa-solid fa-pen"></i> Edit Profile</button>
+            </div>
+        </div>
+    </div>
+    <div class="pin-overlay" id="pinOverlay">
+        <div class="pin-popup">
+            <div style="font-size:3rem;margin-bottom:0.5rem;"><i class="fa-solid fa-lock" style="color:#4169ff;"></i></div>
+            <h2>Set Transaction PIN</h2>
+            <p>Create a 4-digit PIN for secure transactions</p>
+            <input type="password" id="pinInput" maxlength="4" pattern="[0-9]{4}" placeholder="Enter 4-digit PIN">
+            <div class="pin-error" id="pinError"></div>
+            <div class="btn-row">
+                <button class="btn-skip" id="pinSkipBtn">Skip for now</button>
+                <button class="btn-save" id="pinSaveBtn">Set PIN</button>
+            </div>
+        </div>
+    </div>
+    <script src="js/dashboard.js"></script>
+</body>
+</html>
