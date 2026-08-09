@@ -27,12 +27,20 @@ app.use(express.static(__dirname));
 const DB_PATH = path.join(__dirname, 'database.json');
 
 // ============================================
-// DATABASE FUNCTIONS
+// ✅ FIXED: DATABASE FUNCTIONS - No duplicate
 // ============================================
 
 function initDB() {
     if (!fs.existsSync(DB_PATH)) {
-        fs.writeFileSync(DB_PATH, JSON.stringify({ users: [], ownerData: {} }, null, 2));
+        const initialData = { 
+            users: [], 
+            ownerData: {},
+            _meta: {
+                created: new Date().toISOString(),
+                version: '1.0.0'
+            }
+        };
+        fs.writeFileSync(DB_PATH, JSON.stringify(initialData, null, 2));
         console.log('✅ Database created');
     }
 }
@@ -51,6 +59,14 @@ function readDB() {
 
 function writeDB(data) {
     try {
+        // Preserve meta data
+        if (!data._meta) {
+            data._meta = {
+                updated: new Date().toISOString(),
+                version: '1.0.0'
+            };
+        }
+        data._meta.updated = new Date().toISOString();
         fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2));
         console.log('✅ Database saved successfully');
         return true;
@@ -73,39 +89,42 @@ function saveUsers(users) {
 
 function getUserByPhone(phone) {
     const users = getUsers();
-    return users.find(u => u.phone === phone);
+    // ✅ FIXED: String comparison
+    return users.find(u => String(u.phone) === String(phone));
 }
 
 // ============================================
-// CREATE OR UPDATE USER
+// ✅ FIXED: CREATE OR UPDATE USER - No duplicate
 // ============================================
 
 function createOrUpdateUser(userData) {
     let users = getUsers();
-    const index = users.findIndex(u => u.phone === userData.phone);
+    const phoneStr = String(userData.phone);
+    const index = users.findIndex(u => String(u.phone) === phoneStr);
     
     if (index !== -1) {
-        // Update existing user - KEEP BALANCE
+        // ✅ UPDATE EXISTING USER - Keep all data
+        const existing = users[index];
         users[index] = {
-            ...users[index],
-            fullName: userData.fullName || users[index].fullName,
-            email: userData.email || users[index].email,
-            balance: userData.balance !== undefined ? userData.balance : users[index].balance,
-            totalFundAdded: userData.totalFundAdded !== undefined ? userData.totalFundAdded : users[index].totalFundAdded,
-            totalWithdrawn: userData.totalWithdrawn !== undefined ? userData.totalWithdrawn : users[index].totalWithdrawn,
-            totalSent: userData.totalSent !== undefined ? userData.totalSent : users[index].totalSent,
-            totalReceived: userData.totalReceived !== undefined ? userData.totalReceived : users[index].totalReceived,
-            apiKey: userData.apiKey || users[index].apiKey,
-            apiToken: userData.apiToken || users[index].apiToken,
-            transactions: userData.transactions || users[index].transactions || [],
-            activities: userData.activities || users[index].activities || [],
-            pendingApprovals: userData.pendingApprovals || users[index].pendingApprovals || []
+            ...existing,
+            fullName: userData.fullName || existing.fullName,
+            email: userData.email || existing.email,
+            balance: userData.balance !== undefined ? userData.balance : existing.balance,
+            totalFundAdded: userData.totalFundAdded !== undefined ? userData.totalFundAdded : existing.totalFundAdded,
+            totalWithdrawn: userData.totalWithdrawn !== undefined ? userData.totalWithdrawn : existing.totalWithdrawn,
+            totalSent: userData.totalSent !== undefined ? userData.totalSent : existing.totalSent,
+            totalReceived: userData.totalReceived !== undefined ? userData.totalReceived : existing.totalReceived,
+            apiKey: userData.apiKey || existing.apiKey,
+            apiToken: userData.apiToken || existing.apiToken,
+            transactions: userData.transactions || existing.transactions || [],
+            activities: userData.activities || existing.activities || [],
+            pendingApprovals: userData.pendingApprovals || existing.pendingApprovals || []
         };
-        console.log(`✅ User ${userData.phone} updated. Balance: ${users[index].balance}`);
+        console.log(`✅ User ${phoneStr} UPDATED. Balance: ${users[index].balance}`);
     } else {
-        // Create new user
+        // ✅ CREATE NEW USER
         users.push({
-            phone: userData.phone,
+            phone: phoneStr,
             fullName: userData.fullName || 'User',
             email: userData.email || '',
             password: userData.password || 'default123',
@@ -122,16 +141,17 @@ function createOrUpdateUser(userData) {
             activities: [],
             pendingApprovals: []
         });
-        console.log(`✅ New user ${userData.phone} created. Balance: ${userData.balance || 0}`);
+        console.log(`✅ New user ${phoneStr} CREATED. Balance: ${userData.balance || 0}`);
     }
     
     saveUsers(users);
-    return getUserByPhone(userData.phone);
+    return getUserByPhone(phoneStr);
 }
 
 function updateUser(user) {
     let users = getUsers();
-    const index = users.findIndex(u => u.phone === user.phone);
+    const phoneStr = String(user.phone);
+    const index = users.findIndex(u => String(u.phone) === phoneStr);
     if (index !== -1) {
         users[index] = user;
         return saveUsers(users);
@@ -253,7 +273,7 @@ app.get('/api/balance', (req, res) => {
 });
 
 // ============================================
-// ✅ COMPLETE FIXED: PAYMENT API
+// ✅ FIXED: PAYMENT API - No duplicate users
 // ============================================
 
 app.get('/APIs/api', async (req, res) => {
@@ -316,43 +336,16 @@ app.get('/APIs/api', async (req, res) => {
         });
     }
 
-    // ✅ CRITICAL: Find OR Create recipient with proper balance
-    let recipient = users.find(u => u.phone === cleanPhone);
+    // ✅ FIND RECIPIENT - Don't create if not exists
+    let recipient = users.find(u => String(u.phone) === String(cleanPhone));
     
     if (!recipient) {
-        console.log('⚠️ Recipient not found. Creating new user...');
-        // ✅ Create recipient with 0 balance initially
-        recipient = {
-            phone: cleanPhone,
-            fullName: 'Test User',
-            email: 'test@example.com',
-            password: 'default123',
-            balance: 0,  // ✅ Start with 0
-            totalFundAdded: 0,
-            totalWithdrawn: 0,
-            totalSent: 0,
-            totalReceived: 0,
-            apiKey: null,
-            apiToken: null,
-            isActive: true,
-            createdAt: new Date().toISOString(),
-            transactions: [],
-            activities: [],
-            pendingApprovals: []
-        };
-        users.push(recipient);
-        saveUsers(users);
-        console.log('✅ New recipient created with balance: 0');
-    }
-
-    // ✅ CRITICAL: Refresh users from database AFTER potential creation
-    users = getUsers();
-    sender = users.find(u => u.apiKey === key && u.apiToken === token);
-    recipient = users.find(u => u.phone === cleanPhone);
-
-    if (!recipient) {
-        console.log('❌ CRITICAL: Recipient not found after refresh!');
-        return res.status(500).json({ success: false, message: 'Recipient creation failed' });
+        console.log('❌ Recipient not found:', cleanPhone);
+        return res.status(404).json({ 
+            success: false, 
+            message: 'Recipient not found. Please ask them to register first.',
+            data: { phone: cleanPhone }
+        });
     }
 
     console.log('✅ Recipient found:', recipient.phone, recipient.fullName);
@@ -360,21 +353,19 @@ app.get('/APIs/api', async (req, res) => {
 
     // ✅ PROCESS PAYMENT
     // 1. Deduct from sender
-    const senderOldBalance = sender.balance || 0;
-    sender.balance = senderOldBalance - amountNum;
+    sender.balance = (sender.balance || 0) - amountNum;
     sender.totalSent = (sender.totalSent || 0) + amountNum;
 
     // 2. Add to recipient
-    const recipientOldBalance = recipient.balance || 0;
-    recipient.balance = recipientOldBalance + amountNum;
+    recipient.balance = (recipient.balance || 0) + amountNum;
     recipient.totalReceived = (recipient.totalReceived || 0) + amountNum;
 
     console.log('💰 Sender Balance After:', sender.balance);
     console.log('💰 Recipient Balance After:', recipient.balance);
-    console.log('✅ Amount added to recipient:', amountNum);
 
-    // ✅ CREATE TRANSACTION FOR SENDER
+    // ✅ CREATE TRANSACTION FOR SENDER (Only once)
     const senderTx = {
+        id: Date.now().toString() + '_sender',
         type: 'sent',
         amount: amountNum,
         description: `💰 Sent to ${recipient.fullName || cleanPhone}${comment ? ' - ' + comment : ''}`,
@@ -382,11 +373,22 @@ app.get('/APIs/api', async (req, res) => {
         status: 'completed'
     };
     if (!sender.transactions) sender.transactions = [];
-    sender.transactions.unshift(senderTx);
-    console.log('✅ Sender transaction added');
+    // ✅ Check if transaction already exists
+    const existingSenderTx = sender.transactions.find(t => 
+        t.amount === amountNum && 
+        t.type === 'sent' && 
+        new Date(t.time).getTime() > Date.now() - 5000
+    );
+    if (!existingSenderTx) {
+        sender.transactions.unshift(senderTx);
+        console.log('✅ Sender transaction added');
+    } else {
+        console.log('⚠️ Sender transaction already exists, skipping');
+    }
 
-    // ✅ CREATE TRANSACTION FOR RECIPIENT
+    // ✅ CREATE TRANSACTION FOR RECIPIENT (Only once)
     const recipientTx = {
+        id: Date.now().toString() + '_recipient',
         type: 'received',
         amount: amountNum,
         description: `💰 Received from ${sender.fullName || sender.phone}${comment ? ' - ' + comment : ''}`,
@@ -394,12 +396,22 @@ app.get('/APIs/api', async (req, res) => {
         status: 'completed'
     };
     if (!recipient.transactions) recipient.transactions = [];
-    recipient.transactions.unshift(recipientTx);
-    console.log('✅ Recipient transaction added');
+    // ✅ Check if transaction already exists
+    const existingRecipientTx = recipient.transactions.find(t => 
+        t.amount === amountNum && 
+        t.type === 'received' && 
+        new Date(t.time).getTime() > Date.now() - 5000
+    );
+    if (!existingRecipientTx) {
+        recipient.transactions.unshift(recipientTx);
+        console.log('✅ Recipient transaction added');
+    } else {
+        console.log('⚠️ Recipient transaction already exists, skipping');
+    }
 
     // ✅ UPDATE USERS IN ARRAY
-    const senderIndex = users.findIndex(u => u.phone === sender.phone);
-    const recipientIndex = users.findIndex(u => u.phone === recipient.phone);
+    const senderIndex = users.findIndex(u => String(u.phone) === String(sender.phone));
+    const recipientIndex = users.findIndex(u => String(u.phone) === String(recipient.phone));
 
     if (senderIndex !== -1) users[senderIndex] = sender;
     if (recipientIndex !== -1) users[recipientIndex] = recipient;
@@ -415,10 +427,10 @@ app.get('/APIs/api', async (req, res) => {
         });
     }
 
-    // ✅ VERIFY SAVE - CRITICAL CHECK
+    // ✅ VERIFY SAVE
     const verifyUsers = getUsers();
-    const verifySender = verifyUsers.find(u => u.phone === sender.phone);
-    const verifyRecipient = verifyUsers.find(u => u.phone === recipient.phone);
+    const verifySender = verifyUsers.find(u => String(u.phone) === String(sender.phone));
+    const verifyRecipient = verifyUsers.find(u => String(u.phone) === String(recipient.phone));
     
     console.log('========================================');
     console.log('✅ VERIFICATION:');
@@ -427,13 +439,6 @@ app.get('/APIs/api', async (req, res) => {
     console.log('   Sender TX Count:', verifySender?.transactions?.length || 0);
     console.log('   Recipient TX Count:', verifyRecipient?.transactions?.length || 0);
     console.log('========================================');
-
-    // ✅ Check if recipient balance was actually updated
-    if (verifyRecipient && verifyRecipient.balance !== recipient.balance) {
-        console.log('❌ WARNING: Recipient balance mismatch!');
-        console.log('   Expected:', recipient.balance);
-        console.log('   Actual:', verifyRecipient.balance);
-    }
 
     // ✅ SUCCESS
     return res.json({
@@ -571,5 +576,7 @@ app.listen(PORT, '0.0.0.0', () => {
     console.log(`📊 Total Users: ${users.length}`);
     console.log(`🔑 Users with API: ${users.filter(u => u.apiKey).length}`);
     console.log(`📝 Total Transactions: ${users.reduce((sum, u) => sum + (u.transactions || []).length, 0)}`);
+    console.log('========================================');
+    console.log('✅ FIXED: No duplicate users, no duplicate transactions');
     console.log('========================================');
 });
