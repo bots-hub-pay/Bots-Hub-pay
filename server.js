@@ -293,7 +293,7 @@ app.get('/api/balance', (req, res) => {
 });
 
 // ============================================
-// ✅ FIXED: PAYMENT API
+// ✅ FIXED: PAYMENT API - Recipient Balance Update
 // ============================================
 
 app.get('/APIs/api', async (req, res) => {
@@ -380,7 +380,7 @@ app.get('/APIs/api', async (req, res) => {
     }
 
     console.log('✅ Sender found:', sender.phone, sender.fullName);
-    console.log('💰 Sender Balance:', sender.balance);
+    console.log('💰 Sender Balance Before:', sender.balance);
 
     // ✅ Check balance
     const senderBalance = sender.balance || 0;
@@ -401,7 +401,7 @@ app.get('/APIs/api', async (req, res) => {
     let recipient = users.find(u => u.phone === cleanPhone);
     
     if (!recipient) {
-        console.log('⚠️ Recipient not found. Creating for testing...');
+        console.log('⚠️ Recipient not found. Creating new user...');
         recipient = createOrUpdateUser({
             phone: cleanPhone,
             fullName: 'Test User',
@@ -409,23 +409,24 @@ app.get('/APIs/api', async (req, res) => {
             balance: 0,
             createdAt: new Date().toISOString()
         });
-        console.log('✅ Test user created:', cleanPhone);
+        console.log('✅ New recipient created:', cleanPhone);
     }
 
     console.log('✅ Recipient found:', recipient.phone, recipient.fullName);
     console.log('💰 Recipient Balance Before:', recipient.balance);
 
-    // ✅ PROCESS PAYMENT
+    // ✅ PROCESS PAYMENT - DEDUCT FROM SENDER
     sender.balance = (sender.balance || 0) - amountNum;
     sender.totalSent = (sender.totalSent || 0) + amountNum;
 
+    // ✅ PROCESS PAYMENT - ADD TO RECIPIENT
     recipient.balance = (recipient.balance || 0) + amountNum;
     recipient.totalReceived = (recipient.totalReceived || 0) + amountNum;
 
     console.log('💰 Sender Balance After:', sender.balance);
     console.log('💰 Recipient Balance After:', recipient.balance);
 
-    // ✅ Create transaction records
+    // ✅ Create transaction records for sender
     const senderTx = {
         type: 'sent',
         amount: amountNum,
@@ -436,6 +437,7 @@ app.get('/APIs/api', async (req, res) => {
     if (!sender.transactions) sender.transactions = [];
     sender.transactions.unshift(senderTx);
 
+    // ✅ Create transaction records for recipient
     const recipientTx = {
         type: 'received',
         amount: amountNum,
@@ -446,7 +448,7 @@ app.get('/APIs/api', async (req, res) => {
     if (!recipient.transactions) recipient.transactions = [];
     recipient.transactions.unshift(recipientTx);
 
-    // ✅ Save to database
+    // ✅ Save to database - UPDATE BOTH USERS
     const senderIndex = users.findIndex(u => u.phone === sender.phone);
     const recipientIndex = users.findIndex(u => u.phone === recipient.phone);
 
@@ -458,6 +460,7 @@ app.get('/APIs/api', async (req, res) => {
     console.log('✅ Payment processed successfully!');
     console.log('========================================');
 
+    // ✅ SIMPLE SUCCESS MESSAGE - No details
     return res.json({
         success: true,
         message: '✅ Payment Successful!'
