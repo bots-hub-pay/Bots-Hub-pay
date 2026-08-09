@@ -1,7 +1,7 @@
 {
-  "name": "botshub-api",
+  "name": "botshub-pay",
   "version": "1.0.0",
-  "description": "Bots Hub API Server",
+  "description": "Bots Hub Pay - Payment Wallet System",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
