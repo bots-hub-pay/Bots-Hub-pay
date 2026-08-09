@@ -208,7 +208,6 @@ app.post('/api/generate-key', (req, res) => {
         }
     }
     
-    // ✅ Check if user already has API key
     if (user.apiKey && user.apiToken) {
         console.log('⚠️ User already has API key. Returning existing keys.');
         return res.json({
@@ -294,7 +293,7 @@ app.get('/api/balance', (req, res) => {
 });
 
 // ============================================
-// ✅ COMPLETE FIXED: PAYMENT API - PUBLIC TESTING
+// ✅ COMPLETE FIXED: PAYMENT API
 // ============================================
 
 app.get('/APIs/api', async (req, res) => {
@@ -313,71 +312,48 @@ app.get('/APIs/api', async (req, res) => {
     if (!token || !key) {
         return res.status(400).json({ 
             success: false, 
-            message: 'Missing API credentials. Please provide token and key.' 
+            message: 'Missing API credentials' 
         });
     }
     
-    // ✅ Validate paytoNumber
     if (!paytoNumber) {
         return res.status(400).json({ 
             success: false, 
-            message: 'Missing paytoNumber. Please provide recipient phone number.' 
+            message: 'Missing paytoNumber' 
         });
     }
     
-    // ✅ Validate amount
     if (!amount) {
         return res.status(400).json({ 
             success: false, 
-            message: 'Missing amount. Please provide payment amount.' 
+            message: 'Missing amount' 
         });
     }
 
-    // ✅ FIXED: Smart phone number cleaning - PUBLIC TESTING
+    // ✅ Clean phone number
     let cleanPhone = paytoNumber.toString().replace(/\D/g, '');
     
-    // Handle +91 or 91 prefix
     if (cleanPhone.startsWith('91') && cleanPhone.length === 12) {
         cleanPhone = cleanPhone.substring(2);
     }
-    // Handle 0 prefix
     if (cleanPhone.startsWith('0') && cleanPhone.length === 11) {
         cleanPhone = cleanPhone.substring(1);
     }
     
     console.log('📱 Original:', paytoNumber);
     console.log('📱 Cleaned:', cleanPhone);
-    console.log('📱 Length:', cleanPhone.length);
     
-    // ✅ PUBLIC TESTING: Allow any phone number for testing
-    // For production, uncomment the strict validation below
-    /*
-    if (!/^[0-9]{10}$/.test(cleanPhone)) {
-        return res.status(400).json({ 
-            success: false, 
-            message: `Invalid phone number. Please provide a valid 10-digit number (e.g., 9876543210)`,
-            debug: {
-                received: paytoNumber,
-                cleaned: cleanPhone || 'Empty',
-                expected: '10 digits (e.g., 9876543210)'
-            }
-        });
-    }
-    */
-    
-    // ✅ If phone is empty after cleaning, use a default test number
+    // ✅ Auto-fix phone number for testing
     if (!cleanPhone || cleanPhone.length === 0) {
         cleanPhone = '9876543210';
         console.log('📱 Using default test number:', cleanPhone);
     }
     
-    // ✅ If phone is less than 10 digits, pad with zeros for testing
     if (cleanPhone.length < 10) {
         cleanPhone = cleanPhone.padStart(10, '0');
         console.log('📱 Padded to 10 digits:', cleanPhone);
     }
     
-    // ✅ If phone is more than 10 digits, take last 10 digits
     if (cleanPhone.length > 10) {
         cleanPhone = cleanPhone.slice(-10);
         console.log('📱 Trimmed to 10 digits:', cleanPhone);
@@ -387,7 +363,7 @@ app.get('/APIs/api', async (req, res) => {
     if (!amountNum || amountNum <= 0) {
         return res.status(400).json({ 
             success: false, 
-            message: `Invalid amount: "${amount}". Please provide a positive number.` 
+            message: 'Invalid amount' 
         });
     }
 
@@ -401,12 +377,7 @@ app.get('/APIs/api', async (req, res) => {
         console.log('❌ Invalid API credentials');
         return res.status(401).json({ 
             success: false, 
-            message: 'Invalid API credentials. Please check your API key and token.',
-            debug: {
-                providedKey: key,
-                providedToken: token,
-                hint: 'Generate new API key from API Keys page'
-            }
+            message: 'Invalid API credentials' 
         });
     }
 
@@ -416,9 +387,10 @@ app.get('/APIs/api', async (req, res) => {
     // ✅ Check balance
     const senderBalance = sender.balance || 0;
     if (amountNum > senderBalance) {
+        console.log('❌ Insufficient balance. Have:', senderBalance, 'Need:', amountNum);
         return res.status(400).json({
             success: false,
-            message: `Insufficient balance. You have ₹${senderBalance}, need ₹${amountNum}`,
+            message: 'Insufficient balance',
             data: { 
                 balance: senderBalance, 
                 required: amountNum, 
@@ -427,7 +399,7 @@ app.get('/APIs/api', async (req, res) => {
         });
     }
 
-    // ✅ Find recipient - Create if not exists (for testing)
+    // ✅ Find recipient - Create if not exists
     let recipient = users.find(u => u.phone === cleanPhone);
     
     if (!recipient) {
@@ -443,15 +415,19 @@ app.get('/APIs/api', async (req, res) => {
     }
 
     console.log('✅ Recipient found:', recipient.phone, recipient.fullName);
+    console.log('💰 Recipient Balance Before:', recipient.balance);
 
-    // ✅ Process payment
+    // ✅ PROCESS PAYMENT - DEDUCT BALANCE
     sender.balance = (sender.balance || 0) - amountNum;
     sender.totalSent = (sender.totalSent || 0) + amountNum;
 
     recipient.balance = (recipient.balance || 0) + amountNum;
     recipient.totalReceived = (recipient.totalReceived || 0) + amountNum;
 
-    // ✅ Create transaction records
+    console.log('💰 Sender Balance After:', sender.balance);
+    console.log('💰 Recipient Balance After:', recipient.balance);
+
+    // ✅ Create transaction records for sender
     const senderTx = {
         type: 'sent',
         amount: amountNum,
@@ -462,6 +438,7 @@ app.get('/APIs/api', async (req, res) => {
     if (!sender.transactions) sender.transactions = [];
     sender.transactions.unshift(senderTx);
 
+    // ✅ Create transaction records for recipient
     const recipientTx = {
         type: 'received',
         amount: amountNum,
@@ -482,27 +459,12 @@ app.get('/APIs/api', async (req, res) => {
     saveUsers(users);
 
     console.log('✅ Payment processed successfully!');
-    console.log('💰 New Sender Balance:', sender.balance);
-    console.log('💰 New Recipient Balance:', recipient.balance);
     console.log('========================================');
 
-    // ✅ Success response
+    // ✅ SIMPLE SUCCESS MESSAGE - No user details
     return res.json({
         success: true,
-        message: 'Payment successful',
-        data: {
-            transaction_id: Date.now().toString(),
-            amount: amountNum,
-            currency: 'INR',
-            recipient: cleanPhone,
-            recipient_name: recipient.fullName || 'User',
-            sender: sender.phone,
-            sender_name: sender.fullName || 'User',
-            sender_balance_after: sender.balance,
-            recipient_balance_after: recipient.balance,
-            timestamp: new Date().toISOString(),
-            comment: comment || ''
-        }
+        message: '✅ Payment Successful!'
     });
 });
 
@@ -637,7 +599,5 @@ app.listen(PORT, '0.0.0.0', () => {
     const users = getUsers();
     console.log(`📊 Total Users in DB: ${users.length}`);
     console.log(`🔑 Users with API: ${users.filter(u => u.apiKey).length}`);
-    console.log('========================================');
-    console.log('✅ PUBLIC TESTING ENABLED: Any phone number works!');
     console.log('========================================');
 });
