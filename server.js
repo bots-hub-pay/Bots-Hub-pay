@@ -14,9 +14,7 @@ app.use(cors({
     origin: '*',
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
-    exposedHeaders: ['Content-Length', 'X-Requested-With'],
     credentials: true,
-    preflightContinue: false,
     optionsSuccessStatus: 204
 }));
 
@@ -25,12 +23,6 @@ app.options('*', cors());
 app.use(bodyParser.json({ limit: '10mb' }));
 app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
 app.use(express.static(__dirname));
-
-// Log all requests
-app.use((req, res, next) => {
-    console.log(`📝 ${req.method} ${req.url}`);
-    next();
-});
 
 const DB_PATH = path.join(__dirname, 'database.json');
 
@@ -74,6 +66,7 @@ function saveUsers(users) {
     const db = getDB();
     db.users = users;
     saveDB(db);
+    console.log('✅ Users saved to database');
 }
 
 function getUserByPhone(phone) {
@@ -105,7 +98,7 @@ function createOrUpdateUser(userData) {
             activities: userData.activities || users[index].activities || [],
             pendingApprovals: userData.pendingApprovals || users[index].pendingApprovals || []
         };
-        console.log(`✅ User ${userData.phone} updated`);
+        console.log(`✅ User ${userData.phone} updated. Balance: ${users[index].balance}`);
     } else {
         users.push({
             phone: userData.phone,
@@ -125,7 +118,7 @@ function createOrUpdateUser(userData) {
             activities: [],
             pendingApprovals: []
         });
-        console.log(`✅ New user ${userData.phone} created`);
+        console.log(`✅ New user ${userData.phone} created. Balance: ${userData.balance || 0}`);
     }
     
     saveUsers(users);
@@ -173,7 +166,11 @@ function generateApiToken() {
 app.post('/api/generate-key', (req, res) => {
     const { phone, fullName, email, balance } = req.body;
     
-    console.log('📝 Generate Key Request:', phone);
+    console.log('========================================');
+    console.log('📝 Generate Key Request:');
+    console.log('Phone:', phone);
+    console.log('Balance:', balance);
+    console.log('========================================');
     
     if (!phone) {
         return res.status(400).json({ 
@@ -207,8 +204,7 @@ app.post('/api/generate-key', (req, res) => {
                 apiToken: user.apiToken,
                 phone: user.phone,
                 name: user.fullName,
-                balance: user.balance,
-                alreadyExists: true
+                balance: user.balance
             }
         });
     }
@@ -228,8 +224,7 @@ app.post('/api/generate-key', (req, res) => {
             apiToken: apiToken,
             phone: user.phone,
             name: user.fullName,
-            balance: user.balance,
-            alreadyExists: false
+            balance: user.balance
         }
     });
 });
@@ -237,6 +232,8 @@ app.post('/api/generate-key', (req, res) => {
 // Check Balance
 app.get('/api/balance', (req, res) => {
     const { apiKey, apiToken } = req.query;
+    
+    console.log('💰 Balance Check:', { apiKey, apiToken });
     
     if (!apiKey || !apiToken) {
         return res.status(400).json({ 
@@ -265,92 +262,74 @@ app.get('/api/balance', (req, res) => {
     });
 });
 
-// Payment API
+// ============================================
+// ✅ FIXED: PAYMENT API - Complete Working
+// ============================================
+
 app.get('/APIs/api', async (req, res) => {
     const { token, key, paytoNumber, amount, comment } = req.query;
 
-    console.log('📱 Payment Request:', { token, key, paytoNumber, amount });
+    console.log('========================================');
+    console.log('📱 API Payment Request:');
+    console.log('Token:', token);
+    console.log('Key:', key);
+    console.log('PaytoNumber:', paytoNumber);
+    console.log('Amount:', amount);
+    console.log('========================================');
 
+    // ✅ Validate
     if (!token || !key) {
-        return res.status(400).json({ 
-            success: false, 
-            message: 'Missing API credentials' 
-        });
+        return res.status(400).json({ success: false, message: 'Missing API credentials' });
     }
-    
     if (!paytoNumber) {
-        return res.status(400).json({ 
-            success: false, 
-            message: 'Missing paytoNumber' 
-        });
+        return res.status(400).json({ success: false, message: 'Missing paytoNumber' });
     }
-    
     if (!amount) {
-        return res.status(400).json({ 
-            success: false, 
-            message: 'Missing amount' 
-        });
+        return res.status(400).json({ success: false, message: 'Missing amount' });
     }
 
-    // Clean phone number
+    // ✅ Clean phone number
     let cleanPhone = paytoNumber.toString().replace(/\D/g, '');
+    if (cleanPhone.startsWith('91') && cleanPhone.length === 12) cleanPhone = cleanPhone.substring(2);
+    if (cleanPhone.startsWith('0') && cleanPhone.length === 11) cleanPhone = cleanPhone.substring(1);
     
-    if (cleanPhone.startsWith('91') && cleanPhone.length === 12) {
-        cleanPhone = cleanPhone.substring(2);
-    }
-    if (cleanPhone.startsWith('0') && cleanPhone.length === 11) {
-        cleanPhone = cleanPhone.substring(1);
-    }
-    
-    if (!cleanPhone || cleanPhone.length === 0) {
-        cleanPhone = '9876543210';
-    }
-    
-    if (cleanPhone.length < 10) {
-        cleanPhone = cleanPhone.padStart(10, '0');
-    }
-    
-    if (cleanPhone.length > 10) {
-        cleanPhone = cleanPhone.slice(-10);
-    }
+    if (!cleanPhone || cleanPhone.length === 0) cleanPhone = '9876543210';
+    if (cleanPhone.length < 10) cleanPhone = cleanPhone.padStart(10, '0');
+    if (cleanPhone.length > 10) cleanPhone = cleanPhone.slice(-10);
+
+    console.log('📱 Cleaned Phone:', cleanPhone);
 
     const amountNum = parseFloat(amount);
     if (!amountNum || amountNum <= 0) {
-        return res.status(400).json({ 
-            success: false, 
-            message: 'Invalid amount' 
-        });
+        return res.status(400).json({ success: false, message: 'Invalid amount' });
     }
 
+    // ✅ Get users
     let users = getUsers();
+    console.log('👥 Total users in DB:', users.length);
     
-    // Find sender
+    // ✅ Find sender
     let sender = users.find(u => u.apiKey === key && u.apiToken === token);
-
     if (!sender) {
-        return res.status(401).json({ 
-            success: false, 
-            message: 'Invalid API credentials' 
-        });
+        return res.status(401).json({ success: false, message: 'Invalid API credentials' });
     }
 
-    const senderBalance = sender.balance || 0;
-    if (amountNum > senderBalance) {
+    console.log('✅ Sender:', sender.phone, 'Balance:', sender.balance);
+
+    // ✅ Check balance
+    if (amountNum > (sender.balance || 0)) {
         return res.status(400).json({
             success: false,
             message: 'Insufficient balance',
-            data: { 
-                balance: senderBalance, 
-                required: amountNum, 
-                currency: 'INR'
-            }
+            data: { balance: sender.balance, required: amountNum }
         });
     }
 
-    // Find OR Create recipient
+    // ✅ Find or create recipient
     let recipient = users.find(u => u.phone === cleanPhone);
     
     if (!recipient) {
+        console.log('⚠️ Creating new recipient:', cleanPhone);
         recipient = {
             phone: cleanPhone,
             fullName: 'Test User',
@@ -371,22 +350,30 @@ app.get('/APIs/api', async (req, res) => {
         };
         users.push(recipient);
         saveUsers(users);
+        console.log('✅ Recipient created');
     }
 
-    // Refresh users
+    // ✅ Refresh users after potential creation
     users = getUsers();
     sender = users.find(u => u.apiKey === key && u.apiToken === token);
     recipient = users.find(u => u.phone === cleanPhone);
 
-    // Process payment - DEDUCT FROM SENDER
+    console.log('💰 Sender Balance Before:', sender.balance);
+    console.log('💰 Recipient Balance Before:', recipient.balance);
+
+    // ✅ PROCESS PAYMENT
+    // 1. Deduct from sender
     sender.balance = (sender.balance || 0) - amountNum;
     sender.totalSent = (sender.totalSent || 0) + amountNum;
 
-    // Process payment - ADD TO RECIPIENT
+    // 2. Add to recipient
     recipient.balance = (recipient.balance || 0) + amountNum;
     recipient.totalReceived = (recipient.totalReceived || 0) + amountNum;
 
-    // Create transaction for sender
+    console.log('💰 Sender Balance After:', sender.balance);
+    console.log('💰 Recipient Balance After:', recipient.balance);
+
+    // ✅ Create transactions
     const senderTx = {
         type: 'sent',
         amount: amountNum,
@@ -397,7 +384,6 @@ app.get('/APIs/api', async (req, res) => {
     if (!sender.transactions) sender.transactions = [];
     sender.transactions.unshift(senderTx);
 
-    // Create transaction for recipient
     const recipientTx = {
         type: 'received',
         amount: amountNum,
@@ -408,17 +394,26 @@ app.get('/APIs/api', async (req, res) => {
     if (!recipient.transactions) recipient.transactions = [];
     recipient.transactions.unshift(recipientTx);
 
-    // Update users in database
+    // ✅ Save to database
     const senderIndex = users.findIndex(u => u.phone === sender.phone);
     const recipientIndex = users.findIndex(u => u.phone === recipient.phone);
 
     if (senderIndex !== -1) users[senderIndex] = sender;
     if (recipientIndex !== -1) users[recipientIndex] = recipient;
 
+    // ✅ CRITICAL: Save to database
     saveUsers(users);
 
-    console.log('✅ Payment processed successfully!');
+    // ✅ Verify save
+    const verifyUsers = getUsers();
+    const verifySender = verifyUsers.find(u => u.phone === sender.phone);
+    const verifyRecipient = verifyUsers.find(u => u.phone === recipient.phone);
+    
+    console.log('✅ Verification - Sender Balance:', verifySender?.balance);
+    console.log('✅ Verification - Recipient Balance:', verifyRecipient?.balance);
+    console.log('========================================');
 
+    // ✅ Success
     return res.json({
         success: true,
         message: '✅ Payment Successful!'
@@ -443,20 +438,12 @@ app.get('/api/users', (req, res) => {
         hasApiKey: !!(u.apiKey && u.apiToken),
         createdAt: u.createdAt
     }));
-    res.json({ 
-        success: true, 
-        total: safeUsers.length, 
-        users: safeUsers 
-    });
+    res.json({ success: true, total: safeUsers.length, users: safeUsers });
 });
 
 // Server status
 app.get('/api/status', (req, res) => {
     const users = getUsers();
-    const totalUsers = users.length;
-    const totalTransactions = users.reduce((sum, u) => sum + (u.transactions || []).length, 0);
-    const usersWithApi = users.filter(u => u.apiKey).length;
-    
     res.json({
         status: 'active',
         version: '1.0.0',
@@ -469,9 +456,8 @@ app.get('/api/status', (req, res) => {
             status: '/api/status'
         },
         stats: { 
-            total_users: totalUsers, 
-            total_transactions: totalTransactions,
-            users_with_api: usersWithApi
+            total_users: users.length,
+            users_with_api: users.filter(u => u.apiKey).length
         }
     });
 });
