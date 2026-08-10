@@ -1,4 +1,4 @@
-// API Keys JavaScript - Bots Hub Pay (FIXED with LocalStorage Sync)
+// API Keys JavaScript - Bots Hub Pay (FIXED)
 
 const FULL_DOMAIN = 'https://bots-hub-pay.onrender.com';
 
@@ -19,9 +19,40 @@ document.addEventListener('DOMContentLoaded', function() {
         return;
     }
 
+    // ✅ Check if API key already exists
+    checkExistingKey(currentUser);
     loadApiKeys();
     setupEventListeners(currentUser);
 });
+
+// ✅ NEW: Check if API key already exists
+async function checkExistingKey(user) {
+    try {
+        const response = await fetch(`${FULL_DOMAIN}/api/check-key?phone=${user.phone}`);
+        const data = await response.json();
+        
+        if (data.success && data.hasKey) {
+            console.log('✅ API key already exists:', data.data.apiKey);
+            
+            // Update localStorage with existing key
+            const users = JSON.parse(localStorage.getItem('users') || '[]');
+            const index = users.findIndex(u => u.phone === user.phone);
+            if (index !== -1) {
+                users[index].apiKey = data.data.apiKey;
+                users[index].apiToken = data.data.apiToken;
+                users[index].balance = data.data.balance;
+                localStorage.setItem('users', JSON.stringify(users));
+            }
+            
+            loadApiKeys();
+            showToast('✅ API key already exists!', 'success');
+        } else {
+            console.log('ℹ️ No API key found. Please generate one.');
+        }
+    } catch (error) {
+        console.error('Check key error:', error);
+    }
+}
 
 function loadApiKeys() {
     const userPhone = sessionStorage.getItem('userPhone');
@@ -80,17 +111,31 @@ function loadApiKeys() {
 
 function setupEventListeners(currentUser) {
     
-    // Generate API Key
+    // ✅ Generate API Key - Check exists first
     document.getElementById('generateKeyBtn').addEventListener('click', async function() {
-        if (currentUser.apiKey) {
-            if (!confirm('⚠️ You already have an API key. Generating a new one will revoke the old key.\n\nContinue?')) {
-                return;
-            }
-        }
-
-        showToast('⏳ Generating API key...', 'info');
+        showToast('⏳ Checking API key status...', 'info');
 
         try {
+            // ✅ Check if key already exists
+            const checkResponse = await fetch(`${FULL_DOMAIN}/api/check-key?phone=${currentUser.phone}`);
+            const checkData = await checkResponse.json();
+            
+            if (checkData.success && checkData.hasKey) {
+                // ✅ Key already exists - Update localStorage
+                const users = JSON.parse(localStorage.getItem('users') || '[]');
+                const index = users.findIndex(u => u.phone === currentUser.phone);
+                if (index !== -1) {
+                    users[index].apiKey = checkData.data.apiKey;
+                    users[index].apiToken = checkData.data.apiToken;
+                    users[index].balance = checkData.data.balance;
+                    localStorage.setItem('users', JSON.stringify(users));
+                }
+                loadApiKeys();
+                showToast('✅ API key already exists! No need to generate.', 'success');
+                return;
+            }
+            
+            // ✅ No key exists - Generate new
             const response = await fetch(`${FULL_DOMAIN}/api/generate-key`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -114,9 +159,6 @@ function setupEventListeners(currentUser) {
                     users[index].balance = data.data.balance;
                     localStorage.setItem('users', JSON.stringify(users));
                     currentUser = users[index];
-                    
-                    // ✅ Update session
-                    sessionStorage.setItem('userBalance', data.data.balance);
                 }
                 
                 loadApiKeys();
@@ -130,7 +172,7 @@ function setupEventListeners(currentUser) {
         }
     });
 
-    // ✅ FIXED: Test API with LocalStorage Sync
+    // Test API
     document.getElementById('testApiBtn').addEventListener('click', async function() {
         if (!currentUser.apiKey || !currentUser.apiToken) {
             showToast('Please generate an API key first', 'error');
@@ -140,7 +182,6 @@ function setupEventListeners(currentUser) {
         showToast('⏳ Checking balance...', 'info');
 
         try {
-            // ✅ Check balance from server
             const balanceResponse = await fetch(
                 `${FULL_DOMAIN}/api/balance?apiKey=${currentUser.apiKey}&apiToken=${currentUser.apiToken}`
             );
@@ -154,7 +195,7 @@ function setupEventListeners(currentUser) {
             const serverBalance = balanceData.data.balance;
             console.log('💰 Server Balance:', serverBalance);
             
-            // ✅ Update localStorage with server balance
+            // Update localStorage with server balance
             const users = JSON.parse(localStorage.getItem('users') || '[]');
             const index = users.findIndex(u => u.phone === currentUser.phone);
             if (index !== -1) {
@@ -188,7 +229,6 @@ function setupEventListeners(currentUser) {
             const testComment = prompt('Enter comment (optional):', 'API Test Payment');
             showToast('🔍 Processing test payment...', 'info');
 
-            // ✅ Make API call
             const apiUrl = `${FULL_DOMAIN}/APIs/api?token=${currentUser.apiToken}&key=${currentUser.apiKey}&paytoNumber=${testPhone}&amount=${testAmount}&comment=${encodeURIComponent(testComment || 'Test')}`;
 
             const response = await fetch(apiUrl);
@@ -197,19 +237,17 @@ function setupEventListeners(currentUser) {
             if (data.success) {
                 showToast(`✅ Payment Successful!`, 'success');
                 
-                // ✅ IMPORTANT: Sync localStorage with server after payment
+                // Sync after payment
                 const syncResponse = await fetch(
                     `${FULL_DOMAIN}/api/balance?apiKey=${currentUser.apiKey}&apiToken=${currentUser.apiToken}`
                 );
                 const syncData = await syncResponse.json();
                 
                 if (syncData.success) {
-                    // ✅ Update localStorage with new balance
                     const users = JSON.parse(localStorage.getItem('users') || '[]');
                     const index = users.findIndex(u => u.phone === currentUser.phone);
                     if (index !== -1) {
                         users[index].balance = syncData.data.balance;
-                        // ✅ Also get transactions from server
                         const txResponse = await fetch(`${FULL_DOMAIN}/api/transactions/${currentUser.phone}`);
                         const txData = await txResponse.json();
                         if (txData.success) {
@@ -218,8 +256,6 @@ function setupEventListeners(currentUser) {
                         localStorage.setItem('users', JSON.stringify(users));
                         currentUser = users[index];
                     }
-                    
-                    // ✅ Update dashboard balance display
                     updateDashboardBalance(syncData.data.balance);
                 }
             } else {
@@ -267,9 +303,7 @@ function setupEventListeners(currentUser) {
     });
 }
 
-// ✅ NEW: Update dashboard balance
 function updateDashboardBalance(balance) {
-    // Update all balance displays
     const elements = ['userBalance', 'totalBalance', 'addFundBalance', 'withdrawBalance', 'payBalance'];
     elements.forEach(id => {
         const el = document.getElementById(id);
