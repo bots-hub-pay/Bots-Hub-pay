@@ -62,6 +62,25 @@ document.addEventListener('DOMContentLoaded', function() {
             loadDashboardData();
         }
     });
+
+    // ✅ NEW: Update User Button
+    document.getElementById('updateUserBtn').addEventListener('click', function() {
+        const phone = document.getElementById('updateUserPhone').value.trim();
+        const name = document.getElementById('updateUserName').value.trim();
+        const balance = document.getElementById('updateUserBalance').value.trim();
+        
+        if (!phone) {
+            showToast('Please enter a phone number', 'error');
+            return;
+        }
+        
+        if (!name && !balance) {
+            showToast('Please enter name or balance to update', 'error');
+            return;
+        }
+        
+        updateUser(phone, name, balance);
+    });
 });
 
 function loadDashboardData() {
@@ -82,6 +101,75 @@ function loadDashboardData() {
     document.getElementById('pendingCount').textContent = pendingApprovals.filter(a => a.status === 'pending').length + ' pending';
 
     renderApprovals(pendingApprovals);
+    
+    // ✅ NEW: Render users list
+    renderUsersList(users);
+}
+
+// ✅ NEW: Render Users List
+function renderUsersList(users) {
+    const container = document.getElementById('usersList');
+    
+    if (users.length === 0) {
+        container.innerHTML = `<div class="no-users"><i class="fa-regular fa-user"></i><p>No users registered yet</p></div>`;
+        return;
+    }
+    
+    container.innerHTML = users.map(user => `
+        <div class="user-item">
+            <div class="user-info">
+                <div class="user-name">${user.fullName || 'User'}</div>
+                <div class="user-phone">📱 ${user.phone}</div>
+                <div class="user-balance">💰 ₹${(user.balance || 0).toFixed(2)}</div>
+                <div class="user-status ${user.isActive !== false ? 'active' : 'inactive'}">
+                    ${user.isActive !== false ? '✅ Active' : '❌ Inactive'}
+                </div>
+                <div class="user-api">🔑 ${user.apiKey ? 'API Key ✅' : 'No API Key ❌'}</div>
+            </div>
+        </div>
+    `).join('');
+}
+
+// ✅ NEW: Update User Function
+async function updateUser(phone, name, balance) {
+    try {
+        showToast('⏳ Updating user...', 'info');
+        
+        const updateData = { phone };
+        if (name) updateData.fullName = name;
+        if (balance) updateData.balance = parseFloat(balance);
+        
+        const response = await fetch(`${FULL_DOMAIN}/api/update-user`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(updateData)
+        });
+        
+        const data = await response.json();
+        console.log('Update Response:', data);
+        
+        if (data.success) {
+            // ✅ Update localStorage
+            const users = JSON.parse(localStorage.getItem('users') || '[]');
+            const index = users.findIndex(u => u.phone === phone);
+            if (index !== -1) {
+                if (name) users[index].fullName = name;
+                if (balance) users[index].balance = parseFloat(balance);
+                localStorage.setItem('users', JSON.stringify(users));
+            }
+            
+            showToast('✅ User updated successfully! API key preserved!', 'success');
+            document.getElementById('updateUserPhone').value = '';
+            document.getElementById('updateUserName').value = '';
+            document.getElementById('updateUserBalance').value = '';
+            loadDashboardData();
+        } else {
+            showToast('❌ ' + data.message, 'error');
+        }
+    } catch (error) {
+        console.error('Update Error:', error);
+        showToast('❌ Failed to update user', 'error');
+    }
 }
 
 function renderApprovals(approvals) {
@@ -107,7 +195,6 @@ function renderApprovals(approvals) {
                     <span style="font-weight:600;">Amount:</span> ₹${amount.toFixed(2)} 
                     <span style="font-weight:600;">Method:</span> ${approval.method || 'UPI'} 
                     <span style="font-weight:600;">UTR:</span> ${approval.utr || 'N/A'}
-                    <span style="font-weight:600;">Ref:</span> ${approval.reference || 'N/A'}
                 `;
                 break;
             case 'withdraw':
@@ -125,7 +212,6 @@ function renderApprovals(approvals) {
                 details = `
                     <span style="font-weight:600;">Amount:</span> ₹${amount.toFixed(2)} 
                     <span style="font-weight:600;">To:</span> ${approval.recipientName} (${approval.recipientPhone})
-                    ${approval.note ? ' | Note: ' + approval.note : ''}
                 `;
                 break;
         }
@@ -157,7 +243,6 @@ function renderApprovals(approvals) {
     }).join('');
 }
 
-// ✅ FIXED: Approve Request with Server Sync
 window.approveRequest = async function(requestId) {
     if (!confirm('✅ Approve this request?')) return;
     
@@ -194,35 +279,12 @@ window.rejectRequest = function(requestId) {
     loadDashboardData();
 };
 
-// ✅ FIXED: Process Transaction with Server Sync
 async function processTransaction(approval) {
     const users = JSON.parse(localStorage.getItem('users') || '[]');
     const user = users.find(u => u.phone === approval.userPhone);
     if (!user) { showToast('User not found', 'error'); return; }
     if (user.pendingApprovals) {
         user.pendingApprovals = user.pendingApprovals.filter(a => a.id !== approval.id);
-    }
-    
-    // ✅ Sync user with server before processing
-    try {
-        const syncResponse = await fetch(`${FULL_DOMAIN}/api/generate-key`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                phone: user.phone,
-                fullName: user.fullName || 'User',
-                email: user.email || '',
-                balance: user.balance || 0
-            })
-        });
-        const syncData = await syncResponse.json();
-        if (syncData.success) {
-            user.apiKey = syncData.data.apiKey;
-            user.apiToken = syncData.data.apiToken;
-            console.log('✅ User synced to server');
-        }
-    } catch (error) {
-        console.error('Sync Error:', error);
     }
     
     switch(approval.type) {
@@ -235,16 +297,7 @@ async function processTransaction(approval) {
                 type: 'add',
                 amount: approval.amount,
                 description: `Fund Added via ${approval.method} (UTR: ${approval.utr || 'N/A'})`,
-                reference: approval.reference || 'N/A',
                 status: 'approved',
-                time: new Date().toISOString()
-            });
-            
-            if (!user.activities) user.activities = [];
-            user.activities.unshift({
-                text: `✅ Added ₹${approval.amount.toFixed(2)} (Approved by Owner)`,
-                icon: 'fa-solid fa-circle-plus',
-                color: 'green',
                 time: new Date().toISOString()
             });
             break;
@@ -259,14 +312,6 @@ async function processTransaction(approval) {
                 amount: approval.amount,
                 description: `Withdrew to ${approval.account} (${approval.method})`,
                 status: 'approved',
-                time: new Date().toISOString()
-            });
-            
-            if (!user.activities) user.activities = [];
-            user.activities.unshift({
-                text: `✅ Withdrew ₹${approval.amount.toFixed(2)} (Approved by Owner)`,
-                icon: 'fa-solid fa-arrow-right',
-                color: 'orange',
                 time: new Date().toISOString()
             });
             break;
@@ -287,14 +332,6 @@ async function processTransaction(approval) {
                 time: new Date().toISOString()
             });
             
-            if (!user.activities) user.activities = [];
-            user.activities.unshift({
-                text: `✅ Sent ₹${approval.amount.toFixed(2)} to ${recipient.fullName || approval.recipientPhone} (Approved)`,
-                icon: 'fa-solid fa-paper-plane',
-                color: 'purple',
-                time: new Date().toISOString()
-            });
-            
             recipient.balance = (recipient.balance || 0) + approval.amount;
             recipient.totalReceived = (recipient.totalReceived || 0) + approval.amount;
             
@@ -304,14 +341,6 @@ async function processTransaction(approval) {
                 amount: approval.amount,
                 description: `Received from ${user.fullName || approval.userPhone}`,
                 status: 'approved',
-                time: new Date().toISOString()
-            });
-            
-            if (!recipient.activities) recipient.activities = [];
-            recipient.activities.unshift({
-                text: `✅ Received ₹${approval.amount.toFixed(2)} from ${user.fullName || approval.userPhone} (Approved)`,
-                icon: 'fa-solid fa-arrow-down',
-                color: 'green',
                 time: new Date().toISOString()
             });
             
@@ -365,4 +394,4 @@ function showToast(message, type) {
         toast.style.transform = 'translate(-50%, -50%) scale(0.8)';
         setTimeout(() => toast.remove(), 400);
     }, 3000);
-            }
+}
