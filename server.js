@@ -27,7 +27,7 @@ app.use(express.static(__dirname));
 const DB_PATH = path.join(__dirname, 'database.json');
 
 // ============================================
-// DATABASE FUNCTIONS
+// DATABASE FUNCTIONS - FIXED
 // ============================================
 
 function initDB() {
@@ -92,7 +92,7 @@ function getUserByPhone(phone) {
 }
 
 // ============================================
-// CREATE OR UPDATE USER
+// CREATE OR UPDATE USER - FIXED
 // ============================================
 
 function createOrUpdateUser(userData) {
@@ -113,6 +113,7 @@ function createOrUpdateUser(userData) {
             totalReceived: userData.totalReceived !== undefined ? userData.totalReceived : existing.totalReceived,
             apiKey: userData.apiKey || existing.apiKey,
             apiToken: userData.apiToken || existing.apiToken,
+            transactionPin: userData.transactionPin || existing.transactionPin,
             transactions: userData.transactions || existing.transactions || [],
             activities: userData.activities || existing.activities || [],
             pendingApprovals: userData.pendingApprovals || existing.pendingApprovals || [],
@@ -132,6 +133,7 @@ function createOrUpdateUser(userData) {
             totalReceived: 0,
             apiKey: null,
             apiToken: null,
+            transactionPin: null,
             isActive: true,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
@@ -352,7 +354,7 @@ app.get('/api/balance', (req, res) => {
 });
 
 // ============================================
-// ✅ COMPLETE FIXED: PAYMENT API
+// ✅ FIXED: PAYMENT API
 // ============================================
 
 app.get('/APIs/api', async (req, res) => {
@@ -366,7 +368,6 @@ app.get('/APIs/api', async (req, res) => {
     console.log('Amount:', amount);
     console.log('========================================');
 
-    // ✅ Validate
     if (!token || !key) {
         return res.status(400).json({ success: false, message: 'Missing API credentials' });
     }
@@ -377,7 +378,6 @@ app.get('/APIs/api', async (req, res) => {
         return res.status(400).json({ success: false, message: 'Missing amount' });
     }
 
-    // ✅ Clean phone number
     let cleanPhone = paytoNumber.toString().replace(/\D/g, '');
     if (cleanPhone.startsWith('91') && cleanPhone.length === 12) cleanPhone = cleanPhone.substring(2);
     if (cleanPhone.startsWith('0') && cleanPhone.length === 11) cleanPhone = cleanPhone.substring(1);
@@ -393,11 +393,9 @@ app.get('/APIs/api', async (req, res) => {
         return res.status(400).json({ success: false, message: 'Invalid amount' });
     }
 
-    // ✅ Get users
     let users = getUsers();
     console.log('👥 Total users in DB:', users.length);
     
-    // ✅ Find sender
     let sender = users.find(u => u.apiKey === key && u.apiToken === token);
     if (!sender) {
         return res.status(401).json({ success: false, message: 'Invalid API credentials' });
@@ -406,7 +404,6 @@ app.get('/APIs/api', async (req, res) => {
     console.log('✅ Sender found:', sender.phone, sender.fullName);
     console.log('💰 Sender Balance Before:', sender.balance);
 
-    // ✅ CHECK BALANCE - Return error if insufficient
     if (amountNum > (sender.balance || 0)) {
         console.log('❌ Insufficient balance. Have:', sender.balance, 'Need:', amountNum);
         return res.status(400).json({
@@ -420,7 +417,6 @@ app.get('/APIs/api', async (req, res) => {
         });
     }
 
-    // ✅ Find recipient
     let recipient = users.find(u => String(u.phone) === String(cleanPhone));
     
     if (!recipient) {
@@ -436,19 +432,16 @@ app.get('/APIs/api', async (req, res) => {
     console.log('💰 Recipient Balance Before:', recipient.balance);
 
     // ✅ PROCESS PAYMENT
-    const senderOldBalance = sender.balance || 0;
-    const recipientOldBalance = recipient.balance || 0;
-    
-    sender.balance = senderOldBalance - amountNum;
+    sender.balance = (sender.balance || 0) - amountNum;
     sender.totalSent = (sender.totalSent || 0) + amountNum;
 
-    recipient.balance = recipientOldBalance + amountNum;
+    recipient.balance = (recipient.balance || 0) + amountNum;
     recipient.totalReceived = (recipient.totalReceived || 0) + amountNum;
 
     console.log('💰 Sender Balance After:', sender.balance);
     console.log('💰 Recipient Balance After:', recipient.balance);
 
-    // ✅ CREATE TRANSACTION FOR SENDER - With Bot/API details
+    // ✅ CREATE TRANSACTIONS
     const senderTx = {
         id: Date.now().toString() + '_sender',
         type: 'sent',
@@ -462,7 +455,6 @@ app.get('/APIs/api', async (req, res) => {
     sender.transactions.unshift(senderTx);
     console.log('✅ Sender transaction added');
 
-    // ✅ CREATE TRANSACTION FOR RECIPIENT - With sender details
     const recipientTx = {
         id: Date.now().toString() + '_recipient',
         type: 'received',
@@ -523,6 +515,7 @@ app.get('/api/users', (req, res) => {
         email: u.email,
         balance: u.balance || 0,
         hasApiKey: !!(u.apiKey && u.apiToken),
+        hasPin: !!(u.transactionPin),
         isActive: u.isActive !== false,
         transactions: (u.transactions || []).length,
         createdAt: u.createdAt,
@@ -557,6 +550,7 @@ app.get('/api/status', (req, res) => {
         stats: { 
             total_users: users.length,
             users_with_api: users.filter(u => u.apiKey).length,
+            users_with_pin: users.filter(u => u.transactionPin).length,
             total_transactions: users.reduce((sum, u) => sum + (u.transactions || []).length, 0)
         }
     });
@@ -635,10 +629,7 @@ app.listen(PORT, '0.0.0.0', () => {
     const users = getUsers();
     console.log(`📊 Total Users: ${users.length}`);
     console.log(`🔑 Users with API: ${users.filter(u => u.apiKey).length}`);
+    console.log(`🔐 Users with PIN: ${users.filter(u => u.transactionPin).length}`);
     console.log(`📝 Total Transactions: ${users.reduce((sum, u) => sum + (u.transactions || []).length, 0)}`);
-    console.log('========================================');
-    console.log('✅ FIXED: All issues resolved');
-    console.log('✅ Transaction: 🤖 API Payment from/to User (Phone)');
-    console.log('✅ Insufficient balance error message');
     console.log('========================================');
 });
