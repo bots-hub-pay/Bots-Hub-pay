@@ -1,4 +1,4 @@
-// Register JavaScript - Bots Hub Pay
+// Register JavaScript - Bots Hub Pay (FIXED with PIN)
 
 document.addEventListener('DOMContentLoaded', function() {
     const registerForm = document.getElementById('registerForm');
@@ -7,7 +7,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const emailInput = document.getElementById('regEmail');
     const passwordInput = document.getElementById('regPassword');
     const confirmPasswordInput = document.getElementById('regConfirmPassword');
-    const registerButton = document.getElementById('registerBtn');
+    const pinInput = document.getElementById('regPin');
+    const confirmPinInput = document.getElementById('regConfirmPin');
 
     // Eye icons for password fields
     const passwordBox = passwordInput.closest('.input-box');
@@ -20,6 +21,18 @@ document.addEventListener('DOMContentLoaded', function() {
     const eyeIcon2 = createEyeIcon();
     confirmBox.appendChild(eyeIcon2);
     togglePasswordVisibility(eyeIcon2, confirmPasswordInput);
+
+    // Eye icons for PIN fields
+    const pinBox = pinInput.closest('.input-box');
+    const confirmPinBox = confirmPinInput.closest('.input-box');
+
+    const eyeIcon3 = createEyeIcon();
+    pinBox.appendChild(eyeIcon3);
+    togglePasswordVisibility(eyeIcon3, pinInput);
+
+    const eyeIcon4 = createEyeIcon();
+    confirmPinBox.appendChild(eyeIcon4);
+    togglePasswordVisibility(eyeIcon4, confirmPinInput);
 
     function createEyeIcon() {
         const icon = document.createElement('i');
@@ -46,6 +59,21 @@ document.addEventListener('DOMContentLoaded', function() {
         this.value = this.value.replace(/[^0-9]/g, '');
         if (this.value.length > 10) {
             this.value = this.value.slice(0, 10);
+        }
+    });
+
+    // PIN Input - Only numbers, max 4 digits
+    pinInput.addEventListener('input', function() {
+        this.value = this.value.replace(/[^0-9]/g, '');
+        if (this.value.length > 4) {
+            this.value = this.value.slice(0, 4);
+        }
+    });
+
+    confirmPinInput.addEventListener('input', function() {
+        this.value = this.value.replace(/[^0-9]/g, '');
+        if (this.value.length > 4) {
+            this.value = this.value.slice(0, 4);
         }
     });
 
@@ -127,6 +155,43 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
+    // ✅ PIN match check
+    confirmPinInput.addEventListener('input', function() {
+        const pin = pinInput.value;
+        const confirm = this.value;
+
+        let confirmIndicator = document.getElementById('pin-match');
+        if (!confirmIndicator) {
+            confirmIndicator = document.createElement('div');
+            confirmIndicator.id = 'pin-match';
+            const group = this.closest('.input-group');
+            group.appendChild(confirmIndicator);
+        }
+
+        if (confirm.length === 0) {
+            confirmIndicator.innerHTML = '';
+            this.closest('.input-box').style.borderColor = '#e5e9f0';
+            return;
+        }
+
+        if (pin === confirm) {
+            confirmIndicator.innerHTML = `<i class="fa-solid fa-check-circle"></i> PIN matches`;
+            confirmIndicator.style.color = '#00c853';
+            this.closest('.input-box').style.borderColor = '#00c853';
+        } else {
+            confirmIndicator.innerHTML = `<i class="fa-solid fa-circle-exclamation"></i> PINs do not match`;
+            confirmIndicator.style.color = '#ff1744';
+            this.closest('.input-box').style.borderColor = '#ff1744';
+        }
+    });
+
+    pinInput.addEventListener('input', function() {
+        const confirm = confirmPinInput.value;
+        if (confirm.length > 0) {
+            confirmPinInput.dispatchEvent(new Event('input'));
+        }
+    });
+
     function userExists(phone, email) {
         const users = JSON.parse(localStorage.getItem('users') || '[]');
         return users.find(user => user.phone === phone || user.email === email);
@@ -202,6 +267,8 @@ document.addEventListener('DOMContentLoaded', function() {
         const email = emailInput.value.trim();
         const password = passwordInput.value.trim();
         const confirmPassword = confirmPasswordInput.value.trim();
+        const pin = pinInput.value.trim();
+        const confirmPin = confirmPinInput.value.trim();
 
         if (!fullName) { showError(fullNameInput, 'Full name is required'); return; }
         if (fullName.length < 3) { showError(fullNameInput, 'Name must be at least 3 characters'); return; }
@@ -214,6 +281,12 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!password) { showError(passwordInput, 'Password is required'); return; }
         if (password.length < 6) { showError(passwordInput, 'Password must be at least 6 characters'); return; }
         if (password !== confirmPassword) { showError(confirmPasswordInput, 'Passwords do not match'); return; }
+        
+        // ✅ PIN validation
+        if (!pin) { showError(pinInput, 'Transaction PIN is required'); return; }
+        if (pin.length !== 4 || !/^[0-9]{4}$/.test(pin)) { showError(pinInput, 'PIN must be exactly 4 digits'); return; }
+        if (pin !== confirmPin) { showError(confirmPinInput, 'PINs do not match'); return; }
+        
         if (userExists(phone, email)) { showError(phoneInput, '❌ User with this phone or email already exists.'); return; }
 
         showSpinner();
@@ -224,8 +297,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 phone: phone,
                 email: email,
                 password: password,
+                transactionPin: pin, // ✅ Save PIN
                 isActive: true,
                 createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
                 lastLogin: null,
                 loginCount: 0,
                 balance: 0,
@@ -236,13 +311,24 @@ document.addEventListener('DOMContentLoaded', function() {
                 activities: [],
                 transactions: [],
                 pendingApprovals: [],
-                transactionPin: null,
                 apiKey: null,
                 apiToken: null
             };
             const users = JSON.parse(localStorage.getItem('users') || '[]');
             users.push(userData);
             localStorage.setItem('users', JSON.stringify(users));
+
+            // ✅ Also save to server database via API
+            fetch('https://bots-hub-pay.onrender.com/api/generate-key', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    phone: phone,
+                    fullName: fullName,
+                    email: email,
+                    balance: 0
+                })
+            }).catch(err => console.log('Server sync:', err));
 
             hideSpinner();
             showSuccessPopup('🎉 Account Created Successfully!');
@@ -278,7 +364,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Enter key support
     document.addEventListener('keydown', function(e) {
         if (e.key === 'Enter') {
             registerForm.dispatchEvent(new Event('submit'));
