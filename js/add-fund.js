@@ -29,21 +29,44 @@ let selectedAmount = 0;
 let referenceId = '';
 
 function initAddFund(user) {
+    // ✅ Sync balance from server first
+    syncBalanceFromServer(user);
     updateBalanceDisplay(user);
     generateReference();
     updateProgress();
     setupEventListeners(user);
 }
 
+// ✅ NEW: Sync balance from server
+async function syncBalanceFromServer(user) {
+    try {
+        if (user.apiKey && user.apiToken) {
+            const response = await fetch(
+                `${FULL_DOMAIN}/api/balance?apiKey=${user.apiKey}&apiToken=${user.apiToken}`
+            );
+            const data = await response.json();
+            if (data.success) {
+                const users = JSON.parse(localStorage.getItem('users') || '[]');
+                const index = users.findIndex(u => u.phone === user.phone);
+                if (index !== -1) {
+                    users[index].balance = data.data.balance;
+                    localStorage.setItem('users', JSON.stringify(users));
+                    updateBalanceDisplay(users[index]);
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Sync error:', error);
+    }
+}
+
 function setupEventListeners(user) {
-    // Quick amount buttons
     document.querySelectorAll('.quick-btn').forEach(btn => {
         btn.addEventListener('click', function() {
             document.getElementById('fundAmount').value = this.dataset.amount;
         });
     });
     
-    // Step 1: Next
     document.getElementById('step1Next').addEventListener('click', function() {
         const amount = parseInt(document.getElementById('fundAmount').value);
         if (!amount || amount < 1) {
@@ -54,43 +77,35 @@ function setupEventListeners(user) {
         goToStep(2);
     });
     
-    // Step 2: Back
     document.getElementById('step2Back').addEventListener('click', function() {
         goToStep(1);
     });
     
-    // Step 2: Next
     document.getElementById('step2Next').addEventListener('click', function() {
         goToStep(3);
     });
     
-    // Step 3: Back
     document.getElementById('step3Back').addEventListener('click', function() {
         goToStep(2);
     });
     
-    // Step 3: Submit
     document.getElementById('submitFundBtn').addEventListener('click', function() {
         submitFundRequest(user);
     });
     
-    // QR Upload
     document.getElementById('qrUpload').addEventListener('change', function(e) {
         uploadQR(e);
     });
 
-    // UTR Input
     document.getElementById('utrId').addEventListener('input', function() {
         this.value = this.value.toUpperCase();
         document.getElementById('summaryUtr').textContent = this.value || '-';
     });
 
-    // PIN Input
     document.getElementById('fundPin').addEventListener('input', function() {
         this.value = this.value.replace(/[^0-9]/g, '').slice(0, 4);
     });
 
-    // Enter key support
     document.addEventListener('keydown', function(e) {
         if (e.key === 'Enter') {
             if (currentStep === 1) {
@@ -180,7 +195,7 @@ function generateQRCode() {
     };
 }
 
-// ✅ FIXED: Submit Fund Request with Server Sync
+// ✅ FIXED: Submit Fund Request
 async function submitFundRequest(user) {
     const utrId = document.getElementById('utrId').value.trim();
     const pin = document.getElementById('fundPin').value;
@@ -207,11 +222,9 @@ async function submitFundRequest(user) {
         updateUserInDatabase(user);
     }
 
-    // ✅ Sync user with server before submitting
+    // ✅ Sync user with server
     try {
-        showToast('⏳ Syncing with server...', 'info');
-        
-        const syncResponse = await fetch(`${FULL_DOMAIN}/api/generate-key`, {
+        await fetch(`${FULL_DOMAIN}/api/generate-key`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -221,22 +234,10 @@ async function submitFundRequest(user) {
                 balance: user.balance || 0
             })
         });
-        
-        const syncData = await syncResponse.json();
-        console.log('Sync Response:', syncData);
-        
-        if (syncData.success) {
-            user.apiKey = syncData.data.apiKey;
-            user.apiToken = syncData.data.apiToken;
-            user.balance = syncData.data.balance;
-            updateUserInDatabase(user);
-            console.log('✅ User synced with server');
-        }
     } catch (error) {
         console.error('Sync Error:', error);
     }
 
-    // ✅ Create pending approval request
     const request = {
         id: Date.now().toString(),
         type: 'add_fund',
@@ -262,10 +263,6 @@ async function submitFundRequest(user) {
     showToast('✅ Fund request sent for verification!', 'success');
     setTimeout(() => { window.location.href = 'dashboard.html'; }, 1500);
 }
-
-// ============================================
-// OWNER CONTROLS FUNCTIONS
-// ============================================
 
 function checkOwnerStatus(user) {
     const ownerPhone = '8824146248';
@@ -380,10 +377,6 @@ function downloadQR() {
     showToast('✅ QR Code downloaded!', 'success');
 }
 
-// ============================================
-// HELPER FUNCTIONS
-// ============================================
-
 function updateUserInDatabase(user) {
     const users = JSON.parse(localStorage.getItem('users') || '[]');
     const index = users.findIndex(u => u.phone === user.phone);
@@ -449,7 +442,6 @@ function showToast(message, type) {
     }, 3000);
 }
 
-// Make functions globally available for onclick
 window.copyText = copyText;
 window.copyUPIId = copyUPIId;
 window.openUPIApp = openUPIApp;
