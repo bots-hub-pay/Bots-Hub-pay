@@ -118,6 +118,7 @@ function createOrUpdateUser(userData) {
             pendingApprovals: userData.pendingApprovals || existing.pendingApprovals || []
         };
         console.log(`✅ User ${phoneStr} UPDATED. Balance: ${users[index].balance}`);
+        console.log(`🔑 API Key: ${users[index].apiKey ? 'Exists ✅' : 'Not Set ❌'}`);
     } else {
         users.push({
             phone: phoneStr,
@@ -178,21 +179,25 @@ function generateApiToken() {
 }
 
 // ============================================
-// API ENDPOINTS
+// ✅ FIXED: GENERATE API KEY - Check Exists First
 // ============================================
 
-// Generate API Key
 app.post('/api/generate-key', (req, res) => {
     const { phone, fullName, email, balance } = req.body;
     
     console.log('========================================');
-    console.log('📝 Generate Key:', phone);
+    console.log('📝 Generate Key Request:');
+    console.log('Phone:', phone);
     console.log('========================================');
     
     if (!phone) {
-        return res.status(400).json({ success: false, message: 'Phone number is required' });
+        return res.status(400).json({ 
+            success: false, 
+            message: 'Phone number is required' 
+        });
     }
     
+    // ✅ Get or create user
     let user = getUserByPhone(phone);
     
     if (!user) {
@@ -202,14 +207,18 @@ app.post('/api/generate-key', (req, res) => {
             email: email || '',
             balance: balance || 0
         });
+        console.log('✅ New user created');
     } else {
         if (balance !== undefined && balance !== null) {
             user.balance = balance;
             updateUser(user);
         }
+        console.log('✅ Existing user found');
     }
     
+    // ✅ CRITICAL: Check if user already has API key
     if (user.apiKey && user.apiToken) {
+        console.log('✅ User already has API key. Returning existing keys.');
         return res.json({
             success: true,
             message: 'API key already exists',
@@ -218,17 +227,25 @@ app.post('/api/generate-key', (req, res) => {
                 apiToken: user.apiToken,
                 phone: user.phone,
                 name: user.fullName,
-                balance: user.balance
+                balance: user.balance,
+                alreadyExists: true
             }
         });
     }
     
+    // ✅ Generate new API keys only if not exists
     const apiKey = generateApiKey();
     const apiToken = generateApiToken();
     
     user.apiKey = apiKey;
     user.apiToken = apiToken;
     updateUser(user);
+    
+    console.log('✅ New API Keys Generated');
+    console.log('🔑 API Key:', apiKey);
+    console.log('🔐 API Token:', apiToken);
+    console.log('💰 Balance:', user.balance);
+    console.log('========================================');
     
     return res.json({
         success: true,
@@ -238,23 +255,80 @@ app.post('/api/generate-key', (req, res) => {
             apiToken: apiToken,
             phone: user.phone,
             name: user.fullName,
-            balance: user.balance
+            balance: user.balance,
+            alreadyExists: false
         }
     });
 });
 
-// Check Balance
+// ============================================
+// ✅ CHECK API KEY STATUS
+// ============================================
+
+app.get('/api/check-key', (req, res) => {
+    const { phone } = req.query;
+    
+    console.log('🔍 Check Key Status:', phone);
+    
+    if (!phone) {
+        return res.status(400).json({ 
+            success: false, 
+            message: 'Phone number is required' 
+        });
+    }
+    
+    const user = getUserByPhone(phone);
+    
+    if (!user) {
+        return res.status(404).json({ 
+            success: false, 
+            message: 'User not found' 
+        });
+    }
+    
+    if (user.apiKey && user.apiToken) {
+        return res.json({
+            success: true,
+            hasKey: true,
+            message: 'API key exists',
+            data: {
+                apiKey: user.apiKey,
+                apiToken: user.apiToken,
+                phone: user.phone,
+                name: user.fullName,
+                balance: user.balance
+            }
+        });
+    } else {
+        return res.json({
+            success: true,
+            hasKey: false,
+            message: 'No API key found'
+        });
+    }
+});
+
+// ============================================
+// CHECK BALANCE
+// ============================================
+
 app.get('/api/balance', (req, res) => {
     const { apiKey, apiToken } = req.query;
     
     if (!apiKey || !apiToken) {
-        return res.status(400).json({ success: false, message: 'API key and token are required' });
+        return res.status(400).json({ 
+            success: false, 
+            message: 'API key and token are required' 
+        });
     }
     
     const user = getUsers().find(u => u.apiKey === apiKey && u.apiToken === apiToken);
     
     if (!user) {
-        return res.status(401).json({ success: false, message: 'Invalid API credentials' });
+        return res.status(401).json({ 
+            success: false, 
+            message: 'Invalid API credentials' 
+        });
     }
     
     return res.json({
@@ -269,7 +343,7 @@ app.get('/api/balance', (req, res) => {
 });
 
 // ============================================
-// ✅ FIXED: PAYMENT API - Sender Name & Phone
+// ✅ PAYMENT API
 // ============================================
 
 app.get('/APIs/api', async (req, res) => {
@@ -357,7 +431,7 @@ app.get('/APIs/api', async (req, res) => {
     console.log('💰 Sender Balance After:', sender.balance);
     console.log('💰 Recipient Balance After:', recipient.balance);
 
-    // ✅ CREATE TRANSACTION FOR SENDER - With Recipient Details
+    // ✅ CREATE TRANSACTION FOR SENDER
     const senderTx = {
         id: Date.now().toString() + '_sender',
         type: 'sent',
@@ -374,12 +448,10 @@ app.get('/APIs/api', async (req, res) => {
     );
     if (!existingSenderTx) {
         sender.transactions.unshift(senderTx);
-        console.log('✅ Sender transaction added: API Payment to', recipient.fullName);
-    } else {
-        console.log('⚠️ Sender transaction already exists, skipping');
+        console.log('✅ Sender transaction added');
     }
 
-    // ✅ CREATE TRANSACTION FOR RECIPIENT - With Sender Details
+    // ✅ CREATE TRANSACTION FOR RECIPIENT
     const recipientTx = {
         id: Date.now().toString() + '_recipient',
         type: 'received',
@@ -396,9 +468,7 @@ app.get('/APIs/api', async (req, res) => {
     );
     if (!existingRecipientTx) {
         recipient.transactions.unshift(recipientTx);
-        console.log('✅ Recipient transaction added: API Payment from', sender.fullName);
-    } else {
-        console.log('⚠️ Recipient transaction already exists, skipping');
+        console.log('✅ Recipient transaction added');
     }
 
     // ✅ UPDATE USERS IN ARRAY
@@ -419,20 +489,10 @@ app.get('/APIs/api', async (req, res) => {
         });
     }
 
-    // ✅ VERIFY SAVE
-    const verifyUsers = getUsers();
-    const verifySender = verifyUsers.find(u => String(u.phone) === String(sender.phone));
-    const verifyRecipient = verifyUsers.find(u => String(u.phone) === String(recipient.phone));
-    
     console.log('========================================');
-    console.log('✅ VERIFICATION:');
-    console.log('   Sender Balance:', verifySender?.balance);
-    console.log('   Recipient Balance:', verifyRecipient?.balance);
-    console.log('   Sender TX Count:', verifySender?.transactions?.length || 0);
-    console.log('   Recipient TX Count:', verifyRecipient?.transactions?.length || 0);
+    console.log('✅ Payment processed successfully!');
     console.log('========================================');
 
-    // ✅ SUCCESS
     return res.json({
         success: true,
         message: '✅ Payment Successful!'
@@ -446,7 +506,7 @@ app.post('/APIs/api', async (req, res) => {
     app._router.handle(req, res);
 });
 
-// Get all users with transactions
+// Get all users
 app.get('/api/users', (req, res) => {
     const users = getUsers();
     const safeUsers = users.map(u => ({
@@ -454,10 +514,8 @@ app.get('/api/users', (req, res) => {
         name: u.fullName,
         email: u.email,
         balance: u.balance || 0,
-        totalSent: u.totalSent || 0,
-        totalReceived: u.totalReceived || 0,
-        transactions: u.transactions || [],
         hasApiKey: !!(u.apiKey && u.apiToken),
+        transactions: (u.transactions || []).length,
         createdAt: u.createdAt
     }));
     res.json({ success: true, total: safeUsers.length, users: safeUsers });
@@ -569,8 +627,8 @@ app.listen(PORT, '0.0.0.0', () => {
     console.log(`🔑 Users with API: ${users.filter(u => u.apiKey).length}`);
     console.log(`📝 Total Transactions: ${users.reduce((sum, u) => sum + (u.transactions || []).length, 0)}`);
     console.log('========================================');
-    console.log('✅ FIXED: Transaction with Sender Details');
-    console.log('   Sender: "API Payment to [Recipient Name] ([Phone])"');
-    console.log('   Recipient: "API Payment from [Sender Name] ([Phone])"');
+    console.log('✅ FIXED: API key exists check');
+    console.log('   - If key exists, return existing key');
+    console.log('   - If key not exists, generate new key');
     console.log('========================================');
 });
