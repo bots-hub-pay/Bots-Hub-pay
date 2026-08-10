@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Owner Dashboard · Bots Hub</title>
+    <title>Bots Hub Pay · Owner Dashboard</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
+    <link rel="stylesheet" href="css/dashboard-style.css">
     <link rel="stylesheet" href="css/owner-dashboard.css">
     <link rel="icon" href="assets/images/favicon.ico">
 </head>
@@ -30,6 +31,20 @@
                 <div class="owner-stat-card"><div class="icon">⏳</div><div class="number" id="pendingApprovals">0</div><div class="label">Pending Approvals</div></div>
             </div>
 
+            <!-- ✅ NEW: Update User Section -->
+            <div class="actions-section">
+                <div class="action-card">
+                    <h3><i class="fa-solid fa-pen" style="color:#4169ff;"></i> Update User</h3>
+                    <p>Update user details without regenerating API key</p>
+                    <div style="display:flex;gap:0.5rem;flex-wrap:wrap;justify-content:center;">
+                        <input type="tel" id="updateUserPhone" placeholder="Phone number" style="padding:0.5rem 1rem;border:1.5px solid #e5e9f0;border-radius:8px;flex:1;min-width:120px;">
+                        <input type="text" id="updateUserName" placeholder="Full Name" style="padding:0.5rem 1rem;border:1.5px solid #e5e9f0;border-radius:8px;flex:1;min-width:120px;">
+                        <input type="number" id="updateUserBalance" placeholder="Balance" style="padding:0.5rem 1rem;border:1.5px solid #e5e9f0;border-radius:8px;flex:1;min-width:100px;">
+                        <button class="update-btn" id="updateUserBtn"><i class="fa-solid fa-floppy-disk"></i> Update</button>
+                    </div>
+                </div>
+            </div>
+
             <div class="actions-section">
                 <div class="action-card">
                     <h3><i class="fa-solid fa-trash" style="color:#ff1744;"></i> Clear All Data</h3>
@@ -43,6 +58,17 @@
                         <input type="tel" id="clearUserPhone" placeholder="Enter phone number" style="padding:0.5rem 1rem;border:1.5px solid #e5e9f0;border-radius:8px;flex:1;min-width:150px;">
                         <button class="clear-btn" id="clearUserBtn"><i class="fa-solid fa-user-slash"></i> Clear</button>
                     </div>
+                </div>
+            </div>
+
+            <!-- ✅ NEW: Users List -->
+            <div class="users-section">
+                <div class="users-header">
+                    <h2><i class="fa-solid fa-users"></i> Registered Users</h2>
+                    <span style="font-size:0.9rem;color:#6b7280;" id="usersCount">0 users</span>
+                </div>
+                <div id="usersList">
+                    <div class="no-users"><i class="fa-regular fa-user"></i><p>No users registered yet</p></div>
                 </div>
             </div>
 
