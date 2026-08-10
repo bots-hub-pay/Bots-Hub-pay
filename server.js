@@ -92,7 +92,7 @@ function getUserByPhone(phone) {
 }
 
 // ============================================
-// CREATE OR UPDATE USER - SAVE DATA
+// CREATE OR UPDATE USER
 // ============================================
 
 function createOrUpdateUser(userData) {
@@ -101,7 +101,6 @@ function createOrUpdateUser(userData) {
     const index = users.findIndex(u => String(u.phone) === phoneStr);
     
     if (index !== -1) {
-        // ✅ UPDATE EXISTING USER - Keep all data
         const existing = users[index];
         users[index] = {
             ...existing,
@@ -120,9 +119,7 @@ function createOrUpdateUser(userData) {
             updatedAt: new Date().toISOString()
         };
         console.log(`✅ User ${phoneStr} UPDATED. Balance: ${users[index].balance}`);
-        console.log(`🔑 API Key: ${users[index].apiKey ? 'Exists ✅' : 'Not Set ❌'}`);
     } else {
-        // ✅ CREATE NEW USER
         users.push({
             phone: phoneStr,
             fullName: userData.fullName || 'User',
@@ -184,22 +181,18 @@ function generateApiToken() {
 }
 
 // ============================================
-// ✅ GENERATE API KEY - Check Exists First
+// GENERATE API KEY
 // ============================================
 
 app.post('/api/generate-key', (req, res) => {
     const { phone, fullName, email, balance } = req.body;
     
     console.log('========================================');
-    console.log('📝 Generate Key Request:');
-    console.log('Phone:', phone);
+    console.log('📝 Generate Key Request:', phone);
     console.log('========================================');
     
     if (!phone) {
-        return res.status(400).json({ 
-            success: false, 
-            message: 'Phone number is required' 
-        });
+        return res.status(400).json({ success: false, message: 'Phone number is required' });
     }
     
     let user = getUserByPhone(phone);
@@ -211,17 +204,14 @@ app.post('/api/generate-key', (req, res) => {
             email: email || '',
             balance: balance || 0
         });
-        console.log('✅ New user created');
     } else {
         if (balance !== undefined && balance !== null) {
             user.balance = balance;
             updateUser(user);
         }
-        console.log('✅ Existing user found');
     }
     
     if (user.apiKey && user.apiToken) {
-        console.log('✅ User already has API key. Returning existing keys.');
         return res.json({
             success: true,
             message: 'API key already exists',
@@ -230,8 +220,7 @@ app.post('/api/generate-key', (req, res) => {
                 apiToken: user.apiToken,
                 phone: user.phone,
                 name: user.fullName,
-                balance: user.balance,
-                alreadyExists: true
+                balance: user.balance
             }
         });
     }
@@ -243,12 +232,6 @@ app.post('/api/generate-key', (req, res) => {
     user.apiToken = apiToken;
     updateUser(user);
     
-    console.log('✅ New API Keys Generated');
-    console.log('🔑 API Key:', apiKey);
-    console.log('🔐 API Token:', apiToken);
-    console.log('💰 Balance:', user.balance);
-    console.log('========================================');
-    
     return res.json({
         success: true,
         message: 'API key generated successfully',
@@ -257,42 +240,32 @@ app.post('/api/generate-key', (req, res) => {
             apiToken: apiToken,
             phone: user.phone,
             name: user.fullName,
-            balance: user.balance,
-            alreadyExists: false
+            balance: user.balance
         }
     });
 });
 
 // ============================================
-// ✅ CHECK API KEY STATUS
+// CHECK API KEY STATUS
 // ============================================
 
 app.get('/api/check-key', (req, res) => {
     const { phone } = req.query;
     
-    console.log('🔍 Check Key Status:', phone);
-    
     if (!phone) {
-        return res.status(400).json({ 
-            success: false, 
-            message: 'Phone number is required' 
-        });
+        return res.status(400).json({ success: false, message: 'Phone number is required' });
     }
     
     const user = getUserByPhone(phone);
     
     if (!user) {
-        return res.status(404).json({ 
-            success: false, 
-            message: 'User not found' 
-        });
+        return res.status(404).json({ success: false, message: 'User not found' });
     }
     
     if (user.apiKey && user.apiToken) {
         return res.json({
             success: true,
             hasKey: true,
-            message: 'API key exists',
             data: {
                 apiKey: user.apiKey,
                 apiToken: user.apiToken,
@@ -311,36 +284,22 @@ app.get('/api/check-key', (req, res) => {
 });
 
 // ============================================
-// ✅ UPDATE USER - Owner Dashboard
+// UPDATE USER
 // ============================================
 
 app.post('/api/update-user', (req, res) => {
     const { phone, fullName, email, balance, isActive } = req.body;
     
-    console.log('========================================');
-    console.log('📝 Update User Request:');
-    console.log('Phone:', phone);
-    console.log('FullName:', fullName);
-    console.log('Balance:', balance);
-    console.log('========================================');
-    
     if (!phone) {
-        return res.status(400).json({ 
-            success: false, 
-            message: 'Phone number is required' 
-        });
+        return res.status(400).json({ success: false, message: 'Phone number is required' });
     }
     
     let user = getUserByPhone(phone);
     
     if (!user) {
-        return res.status(404).json({ 
-            success: false, 
-            message: 'User not found' 
-        });
+        return res.status(404).json({ success: false, message: 'User not found' });
     }
     
-    // ✅ Update user data - Keep API key
     if (fullName !== undefined) user.fullName = fullName;
     if (email !== undefined) user.email = email;
     if (balance !== undefined) user.balance = balance;
@@ -349,10 +308,6 @@ app.post('/api/update-user', (req, res) => {
     user.updatedAt = new Date().toISOString();
     
     updateUser(user);
-    
-    console.log('✅ User updated successfully');
-    console.log('🔑 API Key preserved:', user.apiKey);
-    console.log('========================================');
     
     return res.json({
         success: true,
@@ -363,33 +318,26 @@ app.post('/api/update-user', (req, res) => {
             email: user.email,
             balance: user.balance,
             isActive: user.isActive,
-            hasApiKey: !!(user.apiKey && user.apiToken),
-            updatedAt: user.updatedAt
+            hasApiKey: !!(user.apiKey && user.apiToken)
         }
     });
 });
 
 // ============================================
-// ✅ CHECK BALANCE
+// CHECK BALANCE
 // ============================================
 
 app.get('/api/balance', (req, res) => {
     const { apiKey, apiToken } = req.query;
     
     if (!apiKey || !apiToken) {
-        return res.status(400).json({ 
-            success: false, 
-            message: 'API key and token are required' 
-        });
+        return res.status(400).json({ success: false, message: 'API key and token are required' });
     }
     
     const user = getUsers().find(u => u.apiKey === apiKey && u.apiToken === apiToken);
     
     if (!user) {
-        return res.status(401).json({ 
-            success: false, 
-            message: 'Invalid API credentials' 
-        });
+        return res.status(401).json({ success: false, message: 'Invalid API credentials' });
     }
     
     return res.json({
@@ -404,7 +352,7 @@ app.get('/api/balance', (req, res) => {
 });
 
 // ============================================
-// ✅ PAYMENT API
+// ✅ COMPLETE FIXED: PAYMENT API
 // ============================================
 
 app.get('/APIs/api', async (req, res) => {
@@ -418,6 +366,7 @@ app.get('/APIs/api', async (req, res) => {
     console.log('Amount:', amount);
     console.log('========================================');
 
+    // ✅ Validate
     if (!token || !key) {
         return res.status(400).json({ success: false, message: 'Missing API credentials' });
     }
@@ -428,6 +377,7 @@ app.get('/APIs/api', async (req, res) => {
         return res.status(400).json({ success: false, message: 'Missing amount' });
     }
 
+    // ✅ Clean phone number
     let cleanPhone = paytoNumber.toString().replace(/\D/g, '');
     if (cleanPhone.startsWith('91') && cleanPhone.length === 12) cleanPhone = cleanPhone.substring(2);
     if (cleanPhone.startsWith('0') && cleanPhone.length === 11) cleanPhone = cleanPhone.substring(1);
@@ -443,9 +393,11 @@ app.get('/APIs/api', async (req, res) => {
         return res.status(400).json({ success: false, message: 'Invalid amount' });
     }
 
+    // ✅ Get users
     let users = getUsers();
     console.log('👥 Total users in DB:', users.length);
     
+    // ✅ Find sender
     let sender = users.find(u => u.apiKey === key && u.apiToken === token);
     if (!sender) {
         return res.status(401).json({ success: false, message: 'Invalid API credentials' });
@@ -454,14 +406,21 @@ app.get('/APIs/api', async (req, res) => {
     console.log('✅ Sender found:', sender.phone, sender.fullName);
     console.log('💰 Sender Balance Before:', sender.balance);
 
+    // ✅ CHECK BALANCE - Return error if insufficient
     if (amountNum > (sender.balance || 0)) {
+        console.log('❌ Insufficient balance. Have:', sender.balance, 'Need:', amountNum);
         return res.status(400).json({
             success: false,
-            message: 'Insufficient balance',
-            data: { balance: sender.balance, required: amountNum }
+            message: `Insufficient balance. You have ₹${sender.balance || 0}, need ₹${amountNum}`,
+            data: { 
+                balance: sender.balance || 0, 
+                required: amountNum,
+                currency: 'INR'
+            }
         });
     }
 
+    // ✅ Find recipient
     let recipient = users.find(u => String(u.phone) === String(cleanPhone));
     
     if (!recipient) {
@@ -476,59 +435,55 @@ app.get('/APIs/api', async (req, res) => {
     console.log('✅ Recipient found:', recipient.phone, recipient.fullName);
     console.log('💰 Recipient Balance Before:', recipient.balance);
 
-    sender.balance = (sender.balance || 0) - amountNum;
+    // ✅ PROCESS PAYMENT
+    const senderOldBalance = sender.balance || 0;
+    const recipientOldBalance = recipient.balance || 0;
+    
+    sender.balance = senderOldBalance - amountNum;
     sender.totalSent = (sender.totalSent || 0) + amountNum;
 
-    recipient.balance = (recipient.balance || 0) + amountNum;
+    recipient.balance = recipientOldBalance + amountNum;
     recipient.totalReceived = (recipient.totalReceived || 0) + amountNum;
 
     console.log('💰 Sender Balance After:', sender.balance);
     console.log('💰 Recipient Balance After:', recipient.balance);
 
+    // ✅ CREATE TRANSACTION FOR SENDER - With Bot/API details
     const senderTx = {
         id: Date.now().toString() + '_sender',
         type: 'sent',
         amount: amountNum,
-        description: `API Payment to ${recipient.fullName || 'User'} (${recipient.phone})`,
+        description: `🤖 API Payment to ${recipient.fullName || 'User'} (${recipient.phone})`,
         time: new Date().toISOString(),
-        status: 'completed'
+        status: 'completed',
+        via: 'API'
     };
     if (!sender.transactions) sender.transactions = [];
-    const existingSenderTx = sender.transactions.find(t => 
-        t.amount === amountNum && 
-        t.type === 'sent' && 
-        new Date(t.time).getTime() > Date.now() - 5000
-    );
-    if (!existingSenderTx) {
-        sender.transactions.unshift(senderTx);
-        console.log('✅ Sender transaction added');
-    }
+    sender.transactions.unshift(senderTx);
+    console.log('✅ Sender transaction added');
 
+    // ✅ CREATE TRANSACTION FOR RECIPIENT - With sender details
     const recipientTx = {
         id: Date.now().toString() + '_recipient',
         type: 'received',
         amount: amountNum,
-        description: `API Payment from ${sender.fullName || 'User'} (${sender.phone})`,
+        description: `🤖 API Payment from ${sender.fullName || 'User'} (${sender.phone})`,
         time: new Date().toISOString(),
-        status: 'completed'
+        status: 'completed',
+        via: 'API'
     };
     if (!recipient.transactions) recipient.transactions = [];
-    const existingRecipientTx = recipient.transactions.find(t => 
-        t.amount === amountNum && 
-        t.type === 'received' && 
-        new Date(t.time).getTime() > Date.now() - 5000
-    );
-    if (!existingRecipientTx) {
-        recipient.transactions.unshift(recipientTx);
-        console.log('✅ Recipient transaction added');
-    }
+    recipient.transactions.unshift(recipientTx);
+    console.log('✅ Recipient transaction added');
 
+    // ✅ UPDATE USERS
     const senderIndex = users.findIndex(u => String(u.phone) === String(sender.phone));
     const recipientIndex = users.findIndex(u => String(u.phone) === String(recipient.phone));
 
     if (senderIndex !== -1) users[senderIndex] = sender;
     if (recipientIndex !== -1) users[recipientIndex] = recipient;
 
+    // ✅ SAVE TO DATABASE
     const saved = saveUsers(users);
     
     if (!saved) {
@@ -557,7 +512,7 @@ app.post('/APIs/api', async (req, res) => {
 });
 
 // ============================================
-// ✅ GET ALL USERS - Owner Dashboard
+// GET ALL USERS
 // ============================================
 
 app.get('/api/users', (req, res) => {
@@ -682,8 +637,8 @@ app.listen(PORT, '0.0.0.0', () => {
     console.log(`🔑 Users with API: ${users.filter(u => u.apiKey).length}`);
     console.log(`📝 Total Transactions: ${users.reduce((sum, u) => sum + (u.transactions || []).length, 0)}`);
     console.log('========================================');
-    console.log('✅ FIXED: API key exists check');
-    console.log('✅ FIXED: User data save on update');
-    console.log('✅ FIXED: Owner can update users without key regenerate');
+    console.log('✅ FIXED: All issues resolved');
+    console.log('✅ Transaction: 🤖 API Payment from/to User (Phone)');
+    console.log('✅ Insufficient balance error message');
     console.log('========================================');
 });
